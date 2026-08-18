@@ -156,27 +156,17 @@
           </button>
         </div>
 
-        <!-- MODO SELECCIONADO (ADMIN / SUPERVISOR / TRABAJADOR) -->
-        <div class="sidebar-role-box p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1.5">
-          <p class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Modo Activo:</p>
-          <select id="select-active-role" onchange="handleRoleSwitch(this.value)" class="w-full bg-slate-800 text-cyan-300 font-extrabold text-xs py-1.5 px-2 rounded-xl border border-cyan-500/30 focus:outline-none cursor-pointer">
-            <option value="ADMIN">👑 Modo Administrador</option>
-            <option value="SUPERVISOR">🛡️ Modo Supervisor Campo</option>
-            <option value="WORKER">👷 Portal del Trabajador</option>
-          </select>
-        </div>
-
         <!-- LISTA DE MENÚS DEL SISTEMA -->
         <nav class="space-y-1" id="sidebar-nav-links">
           
           <!-- 1. Panel de Control -->
-          <button onclick="switchTab('dashboard')" id="side-dashboard" class="sidebar-tab active-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-3 transition cursor-pointer">
+          <button onclick="switchTab('dashboard')" id="side-dashboard" class="sidebar-tab active-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-3 transition cursor-pointer">
             <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
             <span class="sidebar-label">Panel General</span>
           </button>
 
           <!-- 2. Personal (87) -->
-          <button onclick="switchTab('employees')" id="side-employees" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
+          <button onclick="switchTab('employees')" id="side-employees" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
             <div class="flex items-center gap-3">
               <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
               <span class="sidebar-label">Personal</span>
@@ -185,13 +175,13 @@
           </button>
 
           <!-- 3. Diseñador de Fotochecks -->
-          <button onclick="switchTab('badges')" id="side-badges" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <button onclick="switchTab('badges')" id="side-badges" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="id-card" class="w-4 h-4 shrink-0"></i>
             <span class="sidebar-label">Diseñador Fotochecks</span>
           </button>
 
           <!-- 4. Tareo, Modificación & Planillas -->
-          <button onclick="switchTab('reports')" id="side-reports" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
+          <button onclick="switchTab('reports')" id="side-reports" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
             <div class="flex items-center gap-3">
               <i data-lucide="file-spreadsheet" class="w-4 h-4 shrink-0"></i>
               <span class="sidebar-label">Tareo & Planillas</span>
@@ -200,36 +190,30 @@
           </button>
 
           <!-- 5. Sedes & Geocercas GPS -->
-          <button onclick="switchTab('branches')" id="side-branches" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <button onclick="switchTab('branches')" id="side-branches" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-cyan-400"></i>
             <span class="sidebar-label">Sedes & Geocercas GPS</span>
           </button>
 
           <!-- 6. Gestión de Usuarios & Contraseñas -->
-          <button onclick="switchTab('users')" id="side-users" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <button onclick="switchTab('users')" id="side-users" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="key" class="w-4 h-4 shrink-0 text-amber-400"></i>
             <span class="sidebar-label">Usuarios & Credenciales</span>
           </button>
 
           <!-- Separador -->
           <div class="pt-2 pb-0.5">
-            <p class="text-[9px] font-black uppercase text-slate-500 px-3 sidebar-header-text">Marcaciones y Campo</p>
+            <p class="text-[9px] font-black uppercase text-slate-500 px-3 sidebar-header-text">Marcaciones y Kiosco</p>
           </div>
 
           <!-- 7. Kiosco Escáner QR -->
-          <button onclick="switchTab('kiosk')" id="side-kiosk" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <button onclick="switchTab('kiosk')" id="side-kiosk" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="scan" class="w-4 h-4 shrink-0 text-cyan-400"></i>
             <span class="sidebar-label">Kiosco Escáner QR</span>
           </button>
 
-          <!-- 8. Supervisión Móvil de Campo -->
-          <button onclick="switchTab('remote')" id="side-remote" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
-            <i data-lucide="shield-check" class="w-4 h-4 shrink-0 text-emerald-400"></i>
-            <span class="sidebar-label">Supervisor de Campo</span>
-          </button>
-
-          <!-- 9. Portal del Trabajador (Independiente) -->
-          <a href="/portal-trabajador.html" target="_blank" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 transition flex items-center justify-between cursor-pointer border border-amber-500/20">
+          <!-- 8. Portal del Trabajador (Independiente) -->
+          <a href="/portal-trabajador.html" target="_blank" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 transition flex items-center justify-between cursor-pointer border border-amber-500/20">
             <div class="flex items-center gap-3">
               <i data-lucide="external-link" class="w-4 h-4 shrink-0 text-amber-400"></i>
               <span class="sidebar-label">Portal Trabajador (URL)</span>
@@ -242,7 +226,7 @@
 
       <!-- PIE DEL SIDEBAR -->
       <div class="pt-3 border-t border-slate-800/80 space-y-1.5">
-        <div class="p-2 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 sidebar-header-text">
+        <div class="p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 sidebar-header-text">
           <div class="w-7 h-7 rounded-xl bg-blue-600/20 text-cyan-400 flex items-center justify-center font-black text-xs border border-cyan-500/30 shrink-0">
             D
           </div>
@@ -280,9 +264,9 @@
       <span class="text-[9px] font-bold mt-0.5">Tareo</span>
     </button>
 
-    <button onclick="switchTab('remote')" id="mob-remote" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-emerald-300 transition cursor-pointer">
-      <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
-      <span class="text-[9px] font-bold mt-0.5">Supervisor</span>
+    <button onclick="switchTab('kiosk')" id="mob-kiosk" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-cyan-300 transition cursor-pointer">
+      <i data-lucide="scan" class="w-4 h-4 text-cyan-400"></i>
+      <span class="text-[9px] font-bold mt-0.5">Kiosco</span>
     </button>
 
     <button onclick="window.open('/portal-trabajador.html', '_blank')" id="mob-worker" class="mob-tab flex flex-col items-center justify-center py-1 text-amber-400 hover:text-amber-300 transition cursor-pointer">
@@ -293,8 +277,8 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=3.6"></script>
-  <script src="/js/auth.js?v=3.6"></script>
+  <script src="/js/api.js?v=3.7"></script>
+  <script src="/js/auth.js?v=3.7"></script>
   <script>
     // Prevenir anidamiento accidental dentro de iframes
     if (window.self !== window.top) {
@@ -310,8 +294,7 @@
       reports: '/reports.html',
       branches: '/branches.html',
       users: '/users.html',
-      kiosk: '/kiosk.html',
-      remote: '/remote-attendance.html'
+      kiosk: '/kiosk.html'
     };
 
     const MODULE_TITLES = {
@@ -321,8 +304,7 @@
       reports: 'Tareo & Planillas (Excel)',
       branches: 'Sedes & Geocercas GPS',
       users: 'Usuarios & Credenciales',
-      kiosk: 'Kiosco Escáner QR',
-      remote: 'Supervisor Móvil de Campo'
+      kiosk: 'Kiosco Escáner QR'
     };
 
     let isSidebarOpen = window.innerWidth >= 769;
