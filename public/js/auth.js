@@ -50,10 +50,23 @@ function updateThemeButtonsUI(theme) {
 // Aplicación inmediata del tema al cargar el script (Anti-Flicker)
 applyAppTheme(getSavedTheme());
 
+// Detección inmediata de contenedor único (eliminar cabeceras duplicadas)
+if (window.self !== window.top) {
+  document.documentElement.classList.add('is-embedded');
+  if (document.body) document.body.classList.add('is-embedded');
+}
+
 /**
  * Gestión de sesión, navegación y alertas en el frontend
  */
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.self !== window.top) {
+    document.documentElement.classList.add('is-embedded');
+    document.body?.classList.add('is-embedded');
+    const innerNav = document.querySelector('nav.glass-nav');
+    if (innerNav) innerNav.style.display = 'none';
+  }
+
   // Asegurar tema en body
   applyAppTheme(getSavedTheme());
 

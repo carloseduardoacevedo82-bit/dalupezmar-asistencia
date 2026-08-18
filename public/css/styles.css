@@ -50,6 +50,28 @@ body {
   backface-visibility: hidden;
 }
 
+/* ==========================================================================
+   OPTIMIZACIÓN DE ENTORNO ÚNICO Y CELULARES (ELIMINACIÓN DE BARRAS DUPLICADAS)
+   ========================================================================== */
+.is-embedded nav.glass-nav,
+.is-embedded header.glass-nav,
+.is-embedded nav.no-print,
+.is-embedded header.no-print {
+  display: none !important;
+}
+
+.is-embedded body {
+  background: transparent !important;
+  min-height: auto !important;
+  padding: 0 !important;
+}
+
+.is-embedded main {
+  padding-top: 0.75rem !important;
+  padding-bottom: 3.5rem !important;
+  margin-top: 0 !important;
+}
+
 /* 3D Flip Card Effect */
 .card-perspective {
   perspective: 1200px;
