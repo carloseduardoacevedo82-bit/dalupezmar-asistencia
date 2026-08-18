@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kiosco de Asistencia en Tiempo Real | AGY</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kiosco Escáner de Asistencia | DALUPEZMAR</title>
+  
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#002855">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -11,7 +18,7 @@
   <!-- HTML5 QR Code Scanner Library -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css?v=3.0">
   <style>
     #reader {
       border: none !important;
@@ -50,16 +57,14 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
 
   <!-- CABECERA SUPERIOR DEL KIOSCO -->
-  <header class="glass-nav px-6 py-4 flex items-center justify-between">
-    <div class="flex items-center gap-4">
-      <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
-        <i data-lucide="scan-face" class="w-6 h-6 text-white"></i>
-      </div>
+  <header class="glass-nav px-6 py-3 flex items-center justify-between border-b border-slate-800">
+    <div class="flex items-center gap-3.5">
+      <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-11 h-11 rounded-2xl shadow-lg border border-cyan-400/40 object-cover">
       <div>
-        <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
-          KIOSCO DE ASISTENCIA <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">EN VIVO</span>
+        <h1 class="text-base font-black tracking-tight text-white flex items-center gap-2">
+          KIOSCO DE ASISTENCIA <span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">EN VIVO</span>
         </h1>
-        <p class="text-xs text-slate-400 font-medium">CORPORACIÓN GLOBAL TECH S.A.C. • Sede Central</p>
+        <p class="text-[11px] text-slate-400 font-semibold">DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C. • Planta Principal</p>
       </div>
     </div>
 

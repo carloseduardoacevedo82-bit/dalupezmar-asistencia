@@ -628,3 +628,22 @@ body.light-mode thead tr th {
     print-color-adjust: exact !important;
   }
 }
+
+/* Safe Area Insets para Celulares iPhone y Android modernos */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+
+@keyframes bounceShort {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-bounce-short {
+  animation: bounceShort 2.5s infinite ease-in-out;
+}
+

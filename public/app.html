@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DALUPEZMAR | Sistema Integral de Asistencia y Fotochecks</title>
+  
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#002855">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DALUPEZMAR">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- ExcelJS para exportar a Excel con formato -->
+  <script src="/js/exceljs.min.js"></script>
+  <!-- HTML5-QRCode Scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- JsBarcode -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=3.0">
+
+  <style>
+    /* Estilos para el visor embebido sin saltos de página */
+    .app-frame {
+      width: 100%;
+      height: calc(100vh - 72px);
+      border: none;
+      transition: opacity 0.2s ease-in-out;
+    }
+    @media (max-width: 768px) {
+      .app-frame {
+        height: calc(100vh - 134px);
+      }
+    }
+    /* Ocultar barra de scroll en navegación horizontal móvil */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR UNIVERSAL (PC, TABLETS Y CELULARES) -->
+  <header class="h-[72px] bg-slate-900/90 backdrop-blur-xl border-b border-slate-800 px-4 lg:px-6 flex items-center justify-between z-40 relative">
+    
+    <!-- LOGO Y TÍTULO DALUPEZMAR -->
+    <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('dashboard')">
+      <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-11 h-11 rounded-2xl shadow-lg shadow-blue-500/25 border border-cyan-400/40 object-cover">
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base font-black tracking-tight text-white leading-tight">DALUPEZMAR</h1>
+          <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-500/10 text-cyan-400 border border-cyan-500/30">OFICIAL</span>
+        </div>
+        <p class="text-[11px] text-slate-400 font-semibold hidden sm:block">Sistema Integral de Asistencia y Fotochecks</p>
+      </div>
+    </div>
+
+    <!-- PESTAÑAS DE NAVEGACIÓN EN ESCRITORIO Y TABLET -->
+    <nav class="hidden md:flex items-center gap-1.5 bg-slate-950/60 p-1 rounded-2xl border border-slate-800/80">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow-md">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Panel
+      </button>
+
+      <button onclick="switchTab('employees')" id="nav-employees" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/50 transition flex items-center gap-2">
+        <i data-lucide="users" class="w-4 h-4"></i> Personal (87)
+      </button>
+
+      <button onclick="switchTab('badges')" id="nav-badges" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/50 transition flex items-center gap-2">
+        <i data-lucide="id-card" class="w-4 h-4"></i> Fotochecks
+      </button>
+
+      <button onclick="switchTab('reports')" id="nav-reports" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/50 transition flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Tareo & Planillas
+      </button>
+
+      <button onclick="switchTab('kiosk')" id="nav-kiosk" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/50 transition flex items-center gap-2">
+        <i data-lucide="scan" class="w-4 h-4 text-cyan-400"></i> Kiosco QR
+      </button>
+
+      <button onclick="switchTab('remote')" id="nav-remote" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/50 transition flex items-center gap-2">
+        <i data-lucide="map-pin" class="w-4 h-4 text-emerald-400"></i> GPS & Campo
+      </button>
+    </nav>
+
+    <!-- ACCIONES DE CABECERA: BOTÓN INSTALAR PWA, TEMA Y USUARIO -->
+    <div class="flex items-center gap-2.5">
+      
+      <!-- BOTÓN INSTALAR APLICACIÓN EN PC / CELULAR / TABLET -->
+      <button id="btn-install-pwa" onclick="triggerPwaInstall()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 transition cursor-pointer transform hover:scale-105 active:scale-95">
+        <i data-lucide="download" class="w-4 h-4 text-slate-950 stroke-[2.5]"></i>
+        <span class="hidden sm:inline">Instalar App</span>
+      </button>
+
+      <!-- Botón Tema -->
+      <button class="btn-theme-toggle p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 transition" title="Cambiar Tema">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+      </button>
+
+      <!-- Botón Salir / Login -->
+      <button onclick="handleLogout()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 transition" title="Cerrar Sesión">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+      </button>
+
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL DE LA APLICACIÓN (VISOR UNIFICADO EN TIEMPO REAL) -->
+  <main class="flex-1 w-full relative bg-slate-950 overflow-hidden">
+    <iframe id="main-app-frame" src="/dashboard.html" class="app-frame w-full" title="Módulo DALUPEZMAR"></iframe>
+  </main>
+
+  <!-- BARRA DE NAVEGACIÓN INFERIOR PARA DISPOSITIVOS MÓVILES (CELULARES Y TABLETS) -->
+  <nav class="md:hidden h-[62px] bg-slate-900/95 backdrop-blur-2xl border-t border-slate-800 grid grid-cols-6 items-center px-1 z-40 safe-bottom">
+    
+    <button onclick="switchTab('dashboard')" id="mob-dashboard" class="mob-tab flex flex-col items-center justify-center py-1 text-blue-400 font-bold transition">
+      <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+      <span class="text-[9px] mt-0.5">Panel</span>
+    </button>
+
+    <button onclick="switchTab('employees')" id="mob-employees" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-white transition">
+      <i data-lucide="users" class="w-4 h-4"></i>
+      <span class="text-[9px] mt-0.5">Personal</span>
+    </button>
+
+    <button onclick="switchTab('badges')" id="mob-badges" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-white transition">
+      <i data-lucide="id-card" class="w-4 h-4"></i>
+      <span class="text-[9px] mt-0.5">Carnets</span>
+    </button>
+
+    <button onclick="switchTab('reports')" id="mob-reports" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-white transition">
+      <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+      <span class="text-[9px] mt-0.5">Tareo</span>
+    </button>
+
+    <button onclick="switchTab('kiosk')" id="mob-kiosk" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-cyan-300 transition">
+      <i data-lucide="scan" class="w-4 h-4"></i>
+      <span class="text-[9px] mt-0.5">Kiosco</span>
+    </button>
+
+    <button onclick="switchTab('remote')" id="mob-remote" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-emerald-300 transition">
+      <i data-lucide="map-pin" class="w-4 h-4"></i>
+      <span class="text-[9px] mt-0.5">Campo</span>
+    </button>
+
+  </nav>
+
+  <!-- BANNER FLOTANTE DE INSTALACIÓN PWA -->
+  <div id="pwa-install-banner" class="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-50 glass-panel p-4 rounded-3xl border border-amber-500/40 bg-slate-900/95 shadow-2xl flex items-center justify-between gap-3 hidden animate-bounce-short">
+    <div class="flex items-center gap-3">
+      <img src="/icons/icon-192.png" class="w-12 h-12 rounded-2xl shadow-lg border border-amber-500/40 object-cover">
+      <div>
+        <p class="text-xs font-black text-white">Instalar DALUPEZMAR</p>
+        <p class="text-[10px] text-amber-300 font-semibold">Acceso rápido sin navegador en tu pantalla</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="dismissInstallBanner()" class="p-2 text-slate-400 hover:text-white text-xs">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+      <button onclick="triggerPwaInstall()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md">
+        Instalar
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE AYUDA DE INSTALACIÓN PARA IPHONE / IPAD (IOS) -->
+  <div id="modal-ios-install" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-sm w-full border border-slate-700 shadow-2xl space-y-4 text-center">
+      <img src="/icons/icon-192.png" class="w-16 h-16 rounded-2xl mx-auto shadow-xl border border-cyan-400/40">
+      <h3 class="text-sm font-black text-white">Instalar DALUPEZMAR en iPhone / iPad</h3>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        1. En Safari, toca el botón <b>Compartir</b> <i data-lucide="share" class="w-4 h-4 inline text-blue-400"></i> abajo.<br>
+        2. Desliza hacia abajo y selecciona <b>"Añadir a la pantalla de inicio"</b> 📲.<br>
+        3. Toca <b>"Añadir"</b> arriba a la derecha.
+      </p>
+      <button onclick="document.getElementById('modal-ios-install').classList.add('hidden')" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs">
+        Entendido
+      </button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=3.0"></script>
+  <script src="/js/auth.js?v=3.0"></script>
+  <script>
+    lucide.createIcons();
+
+    // Rutas de los módulos integrados
+    const MODULE_ROUTES = {
+      dashboard: '/dashboard.html',
+      employees: '/employees.html',
+      badges: '/badge-designer.html',
+      reports: '/reports.html',
+      kiosk: '/kiosk.html',
+      remote: '/remote-attendance.html'
+    };
+
+    let currentActiveTab = 'dashboard';
+
+    // Función universal de cambio de módulo sin cambiar de URL
+    function switchTab(tabKey) {
+      if (!MODULE_ROUTES[tabKey]) return;
+      currentActiveTab = tabKey;
+
+      const frame = document.getElementById('main-app-frame');
+      if (frame) {
+        frame.style.opacity = '0.5';
+        frame.src = MODULE_ROUTES[tabKey];
+        frame.onload = () => { frame.style.opacity = '1'; };
+      }
+
+      // Actualizar pestañas Desktop
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.className = 'nav-tab px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800/50 transition flex items-center gap-2';
+      });
+      const activeNav = document.getElementById(`nav-${tabKey}`);
+      if (activeNav) {
+        activeNav.className = 'nav-tab px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-blue-600 text-white shadow-md';
+      }
+
+      // Actualizar pestañas Móvil
+      document.querySelectorAll('.mob-tab').forEach(btn => {
+        btn.className = 'mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-white transition';
+      });
+      const activeMob = document.getElementById(`mob-${tabKey}`);
+      if (activeMob) {
+        activeMob.className = 'mob-tab flex flex-col items-center justify-center py-1 text-cyan-400 font-extrabold transition';
+      }
+
+      lucide.createIcons();
+    }
+
+    function handleLogout() {
+      if (confirm('¿Deseas cerrar sesión del sistema?')) {
+        api.clearSession();
+        window.location.href = '/index.html';
+      }
+    }
+
+    // =========================================================================
+    // LÓGICA DE INSTALACIÓN PWA (PC, ANDROID, TABLET, IOS)
+    // =========================================================================
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner && !sessionStorage.getItem('pwa_dismissed')) {
+        banner.classList.remove('hidden');
+      }
+    });
+
+    function triggerPwaInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('Usuario instaló DALUPEZMAR PWA');
+          }
+          deferredPrompt = null;
+          document.getElementById('pwa-install-banner')?.classList.add('hidden');
+        });
+      } else {
+        // Si es iOS Safari
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIos) {
+          document.getElementById('modal-ios-install')?.classList.remove('hidden');
+        } else {
+          alert('Para instalar DALUPEZMAR:\nEn Chrome/Edge haz clic en el ícono de instalar (⊕) en la barra de direcciones superior de tu navegador.');
+        }
+      }
+    }
+
+    function dismissInstallBanner() {
+      document.getElementById('pwa-install-banner')?.classList.add('hidden');
+      sessionStorage.setItem('pwa_dismissed', 'true');
+    }
+
+    // Registrar Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          console.log('DALUPEZMAR PWA Service Worker activo:', reg.scope);
+        }).catch((err) => {
+          console.log('Service Worker falló:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
