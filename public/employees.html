@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Personal y Horarios | AGY Asistencia</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Estilos Maestros -->
+  <link rel="stylesheet" href="/css/styles.css?v=2.1">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <nav class="glass-nav sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between no-print">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+        <i data-lucide="users" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-200 bg-clip-text text-transparent">
+          Gestión de Personal
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">Colaboradores, Turnos y Credenciales</p>
+      </div>
+    </div>
+
+    <!-- Menú de Enlaces -->
+    <div class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+      <a href="/dashboard.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+      </a>
+      <a href="/employees.html" class="px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white shadow-md flex items-center gap-2">
+        <i data-lucide="users" class="w-4 h-4"></i> Personal
+      </a>
+      <a href="/badge-designer.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="badge-check" class="w-4 h-4"></i> Fotochecks
+      </a>
+      <a href="/kiosk.html" target="_blank" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-cyan-400 hover:bg-cyan-500/10 transition flex items-center gap-2">
+        <i data-lucide="scan" class="w-4 h-4"></i> Modo Kiosco
+      </a>
+      <a href="/reports.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Tareo & Planillas
+      </a>
+    </div>
+
+    <!-- Perfil, Tema y Logout -->
+    <div class="flex items-center gap-3">
+      <!-- Botón Modo Claro / Oscuro -->
+      <button class="btn-theme-toggle p-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700/50 transition flex items-center gap-2" title="Cambiar Modo Claro / Oscuro">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+        <span class="hidden sm:inline text-xs font-bold">Modo Claro</span>
+      </button>
+
+      <div class="text-right hidden sm:block">
+        <p id="nav-user-name" class="text-sm font-semibold text-slate-200">Administrador</p>
+        <p id="nav-user-role" class="text-xs text-blue-400 font-mono">ADMIN</p>
+      </div>
+      <button id="btn-logout" class="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/50 transition">
+        <i data-lucide="log-out" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    
+    <!-- PESTAÑAS / CARPETAS DE PERSONAL (ACTIVOS VS BAJAS) -->
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
+      <div class="flex items-center gap-3">
+        <button id="tab-folder-active" onclick="switchFolder('ACTIVE')" class="px-5 py-2.5 rounded-2xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center gap-2.5 transition shadow-lg shadow-emerald-950/40 cursor-pointer">
+          <i data-lucide="folder-check" class="w-4 h-4 text-emerald-400"></i>
+          <span>Carpeta: Personal Activo</span>
+          <span id="badge-count-active" class="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px]">82</span>
+        </button>
+
+        <button id="tab-folder-inactive" onclick="switchFolder('INACTIVE')" class="px-5 py-2.5 rounded-2xl bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-slate-200 hover:bg-slate-800 font-bold text-xs flex items-center gap-2.5 transition cursor-pointer">
+          <i data-lucide="folder-x" class="w-4 h-4 text-rose-400"></i>
+          <span>Carpeta: Personal Cesado / Bajas</span>
+          <span id="badge-count-inactive" class="px-2 py-0.5 rounded-full bg-slate-800 text-rose-400 font-black text-[10px]">0</span>
+        </button>
+      </div>
+
+      <!-- Botón Nuevo Empleado -->
+      <button id="btn-open-new-emp-modal" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition transform active:scale-95">
+        <i data-lucide="user-plus" class="w-4 h-4"></i> Nuevo Colaborador
+      </button>
+    </div>
+
+    <!-- BARRA DE ACCIÓN Y BÚSQUEDA -->
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      
+      <!-- Buscador y Filtros -->
+      <div class="flex-1 flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 min-w-[240px]">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
+          <input type="text" id="emp-search" placeholder="Buscar por nombre, DNI, CEX o código..." class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <select id="emp-filter-dept" class="bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 font-medium">
+          <option value="">Todas las Áreas / Puestos</option>
+        </select>
+
+        <select id="emp-filter-mode" class="bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 font-medium">
+          <option value="">Todas las Modalidades</option>
+          <option value="PRESENTIAL">Presencial</option>
+          <option value="REMOTE">Remoto</option>
+          <option value="HYBRID">Híbrido</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- TABLA DE EMPLEADOS -->
+    <div class="glass-panel rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+            <tr>
+              <th class="px-6 py-4">Colaborador</th>
+              <th class="px-6 py-4">Documento</th>
+              <th class="px-6 py-4">Área / Cargo</th>
+              <th class="px-6 py-4">Sede / Planta</th>
+              <th class="px-6 py-4">Turno Asignado</th>
+              <th class="px-6 py-4">Estado</th>
+              <th class="px-6 py-4 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="employees-table-body" class="divide-y divide-slate-800/60">
+            <tr>
+              <td colspan="7" class="px-6 py-8 text-center text-slate-500">Cargando trabajadores...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE CREACIÓN / EDICIÓN DE EMPLEADO -->
+  <div id="modal-employee" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="glass-panel p-6 sm:p-8 rounded-3xl max-w-2xl w-full border border-slate-700 shadow-2xl space-y-6 my-8">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <h3 id="modal-emp-title" class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-5 h-5 text-blue-400"></i> Registrar Nuevo Colaborador
+        </h3>
+        <button id="btn-close-emp-modal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-employee" class="space-y-4">
+        <input type="hidden" id="emp-form-id">
+
+        <!-- Fila 1: Nombres y Apellidos -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Nombres *</label>
+            <input type="text" id="emp-first-name" required placeholder="Ej: Carlos Alberto" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Apellidos *</label>
+            <input type="text" id="emp-last-name" required placeholder="Ej: Mendoza Quispe" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <!-- Fila 2: Documento y Código -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Tipo Doc *</label>
+            <select id="emp-doc-type" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 font-bold">
+              <option value="DNI">DNI (8 dígitos)</option>
+              <option value="CEX">CEX (Carné Extranjería - 9 dígitos)</option>
+              <option value="CPP">CPP (Permiso Temporal)</option>
+              <option value="PASAPORTE">Pasaporte</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Número Documento *</label>
+            <input type="text" id="emp-doc-number" required placeholder="45892147" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Grupo Sanguíneo</label>
+            <select id="emp-blood-type" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="AB+">AB+</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 3: Sede, Departamento y Cargo -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Sede *</label>
+            <select id="emp-branch" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Departamento / Área *</label>
+            <select id="emp-department" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Cargo / Puesto *</label>
+            <select id="emp-position" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
+          </div>
+        </div>
+
+        <!-- Fila 4: Turno y Modalidad -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Turno de Horario *</label>
+            <select id="emp-shift" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Modalidad de Trabajo *</label>
+            <select id="emp-work-mode" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+              <option value="PRESENTIAL">Presencial</option>
+              <option value="REMOTE">Remoto (Home Office)</option>
+              <option value="HYBRID">Híbrido</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 5: Contacto de Emergencia -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Nombre Contacto Emergencia</label>
+            <input type="text" id="emp-emergency-name" placeholder="Ej: Elena Quispe (Madre)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Teléfono Contacto Emergencia</label>
+            <input type="text" id="emp-emergency-phone" placeholder="+51 981122334" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <!-- Fila 6: Foto de Perfil -->
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Foto de Perfil para Fotocheck</label>
+          <input type="file" id="emp-photo" accept="image/png,image/jpeg,image/webp" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500">
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
+          <button type="button" id="btn-cancel-emp-modal" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-semibold">
+            Cancelar
+          </button>
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20">
+            Guardar Colaborador
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+  <!-- MODAL DE DAR DE BAJA -->
+  <div id="modal-terminate-emp" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-rose-500/40 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3 text-rose-400 border-b border-slate-800 pb-3">
+        <div class="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+          <i data-lucide="user-x" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-extrabold text-white">Dar de Baja a Colaborador</h3>
+          <p class="text-xs text-slate-400">Mover a la Carpeta de Personal Cesado</p>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-300 leading-relaxed">
+        ¿Confirmas dar de baja a <b id="terminate-emp-name" class="text-white"></b>? Su credencial quedará inactiva para el control de asistencia y su ficha pasará a la <b class="text-rose-400 font-bold">Carpeta de Bajas</b>.
+      </p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Motivo de Cese</label>
+          <select id="terminate-reason" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-medium">
+            <option value="Término de Contrato">Término de Contrato</option>
+            <option value="Renuncia Voluntaria">Renuncia Voluntaria</option>
+            <option value="Mutuo Disenso">Mutuo Disenso</option>
+            <option value="Despido / Cese Laboral">Despido / Cese Laboral</option>
+            <option value="Otro Motivo">Otro Motivo</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Fecha de Baja</label>
+          <input type="date" id="terminate-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-bold">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" id="btn-cancel-terminate" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">Cancelar</button>
+        <button type="button" id="btn-confirm-terminate" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition flex items-center gap-2">
+          <i data-lucide="user-minus" class="w-4 h-4"></i> Confirmar Baja
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=2.5"></script>
+  <script src="/js/auth.js?v=2.5"></script>
+  <script src="/js/employees.js?v=2.5"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reportes de Tareo y Planillas | AGY Asistencia</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- SheetJS & ExcelJS for Full Styled Native Excel Tables -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="/js/exceljs.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=2.3">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <nav class="glass-nav sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between no-print">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+        <i data-lucide="file-spreadsheet" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-200 bg-clip-text text-transparent">
+          Reportes de Tareo & Planillas
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">Exportación de Asistencia para RRHH y Nóminas</p>
+      </div>
+    </div>
+
+    <!-- Menú de Enlaces -->
+    <div class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+      <a href="/dashboard.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+      </a>
+      <a href="/employees.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="users" class="w-4 h-4"></i> Personal
+      </a>
+      <a href="/badge-designer.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="badge-check" class="w-4 h-4"></i> Fotochecks
+      </a>
+      <a href="/kiosk.html" target="_blank" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-cyan-400 hover:bg-cyan-500/10 transition flex items-center gap-2">
+        <i data-lucide="scan" class="w-4 h-4"></i> Modo Kiosco
+      </a>
+      <a href="/reports.html" class="px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white shadow-md flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Tareo & Planillas
+      </a>
+    </div>
+
+    <!-- Perfil, Tema y Logout -->
+    <div class="flex items-center gap-3">
+      <!-- Botón Modo Claro / Oscuro -->
+      <button class="btn-theme-toggle p-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700/50 transition flex items-center gap-2" title="Cambiar Modo Claro / Oscuro">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+        <span class="hidden sm:inline text-xs font-bold">Modo Claro</span>
+      </button>
+
+      <div class="text-right hidden sm:block">
+        <p id="nav-user-name" class="text-sm font-semibold text-slate-200">Administrador</p>
+        <p id="nav-user-role" class="text-xs text-blue-400 font-mono">ADMIN</p>
+      </div>
+      <button id="btn-logout" class="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/50 transition">
+        <i data-lucide="log-out" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    
+    <!-- SECCIÓN DESTACADA: DESCARGA DIARIA DE ASISTENCIA POR ÁREAS -->
+    <div class="glass-panel p-6 rounded-3xl border border-cyan-500/30 bg-gradient-to-r from-slate-900 via-slate-900/90 to-cyan-950/40 shadow-xl space-y-4 no-print">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+            <span class="p-1.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+              <i data-lucide="calendar-check" class="w-5 h-5"></i>
+            </span>
+            Descarga Diaria de Asistencia por Áreas
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Generación y exportación de partes diarios de personal en Sede <b class="text-cyan-300 font-bold">PECEPE S.A.C.</b></p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <button id="btn-daily-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition active:scale-95">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Excel Diario (.xlsx)
+          </button>
+          <button id="btn-daily-export-pdf" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition active:scale-95">
+            <i data-lucide="file-text" class="w-4 h-4"></i> Descargar / Imprimir PDF Diario
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros Rápidos Diarios -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Fecha del Día</label>
+          <input type="date" id="daily-rep-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Área / Departamento</label>
+          <select id="daily-rep-area" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold">
+            <option value="">Todas las Áreas</option>
+            <option value="Troquelado de Anillas">Troquelado de Anillas</option>
+            <option value="AREA EXTERIOR">Área Exterior</option>
+            <option value="Producción">Producción</option>
+            <option value="Operaciones y Logística">Operaciones y Logística</option>
+            <option value="Administración y Finanzas">Administración y Finanzas</option>
+            <option value="Recursos Humanos y Talento">Recursos Humanos y Talento</option>
+            <option value="Tecnología e Innovación">Tecnología e Innovación</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Planta / Sede</label>
+          <select id="daily-rep-branch" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500 font-bold">
+            <option value="1">PECEPE S.A.C. (Planta Principal)</option>
+            <option value="2">Planta Operativa Callao</option>
+            <option value="4">Planta Principal DALUPEZMAR</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL DE FILTROS AVANZADOS DE TAREO HISTÓRICO -->
+    <div class="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 no-print">
+      <h2 class="text-base font-bold text-white flex items-center gap-2">
+        <i data-lucide="filter" class="w-5 h-5 text-cyan-400"></i> Consulta Histórica por Rango de Fechas
+      </h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha Inicio</label>
+          <input type="date" id="rep-start-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha Fin</label>
+          <input type="date" id="rep-end-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Departamento</label>
+          <select id="rep-filter-dept" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+            <option value="">Todos los Departamentos</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Estado</label>
+          <select id="rep-filter-status" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+            <option value="">Todos los Estados</option>
+            <option value="PRESENT">Puntual (Presente)</option>
+            <option value="LATE">Con Tardanza</option>
+            <option value="JUSTIFIED">Justificado</option>
+            <option value="ABSENT">Inasistencia</option>
+          </select>
+        </div>
+
+        <div class="flex items-end">
+          <button id="btn-query-report" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition">
+            <i data-lucide="search" class="w-4 h-4"></i> Consultar Rango
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESUMEN DE TOTALES DEL PERÍODO -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] text-slate-400 font-bold uppercase">Registros Encontrados</p>
+          <p id="tot-records" class="text-2xl font-black text-white font-mono mt-0.5">0</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+          <i data-lucide="list-checks" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] text-slate-400 font-bold uppercase">Total Tardanzas</p>
+          <p id="tot-late-mins" class="text-2xl font-black text-amber-400 font-mono mt-0.5">0 min</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+          <i data-lucide="clock-alert" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-[11px] text-slate-400 font-bold uppercase">Horas Extras Acumuladas</p>
+          <p id="tot-overtime-hrs" class="text-2xl font-black text-cyan-400 font-mono mt-0.5">0.0 h</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+          <i data-lucide="clock" class="w-5 h-5"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTONES DE EXPORTACIÓN -->
+    <div class="flex flex-wrap items-center justify-between gap-4 no-print">
+      <h3 class="text-sm font-bold text-white flex items-center gap-2">
+        <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i> Tabla Consolidada de Tareo
+      </h3>
+
+      <div class="flex items-center gap-3">
+        <button id="btn-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar a Excel (.xlsx)
+        </button>
+        <button id="btn-export-csv" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
+          <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i> Exportar CSV
+        </button>
+        <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
+          <i data-lucide="printer" class="w-4 h-4 text-purple-400"></i> Imprimir Reporte
+        </button>
+      </div>
+    </div>
+
+    <!-- TABLA DE TAREO -->
+    <div class="glass-panel rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
+            <tr>
+              <th class="px-4 py-3.5">Fecha</th>
+              <th class="px-4 py-3.5">Colaborador</th>
+              <th class="px-4 py-3.5">Área / Cargo</th>
+              <th class="px-4 py-3.5 text-center">Entrada</th>
+              <th class="px-4 py-3.5 text-center">Inicio Ref.</th>
+              <th class="px-4 py-3.5 text-center">Fin Ref.</th>
+              <th class="px-4 py-3.5 text-center">Salida</th>
+              <th class="px-4 py-3.5 text-center">Horas Efec.</th>
+              <th class="px-4 py-3.5 text-center">Tardanza</th>
+              <th class="px-4 py-3.5 text-center">H. Extras</th>
+              <th class="px-4 py-3.5 text-center">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="report-table-body" class="divide-y divide-slate-800/60 font-mono">
+            <tr>
+              <td colspan="11" class="px-6 py-8 text-center text-slate-500 font-sans">
+                Selecciona un rango de fechas y presiona "Consultar Tareo".
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=2.3"></script>
+  <script src="/js/auth.js?v=2.3"></script>
+  <script src="/js/reports.js?v=2.3"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

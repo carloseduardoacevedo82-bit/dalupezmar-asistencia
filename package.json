@@ -1,0 +1,41 @@
+{
+  "name": "sistema-asistencia-fotocheck",
+  "version": "1.0.0",
+  "description": "Sistema de Control de Asistencia Diaria y Emisión de Fotochecks Digitales e Imprimibles",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "build": "node database/initDb.js && node database/importDalupezmarWorkers.js",
+    "dev": "node --watch src/server.js",
+    "db:init": "node database/initDb.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "asistencia",
+    "fotocheck",
+    "recursos-humanos",
+    "qr-code",
+    "barcode",
+    "kiosco-asistencia"
+  ],
+  "author": "Antigravity AI Architecture Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "localtunnel": "^2.0.2"
+  }
+}

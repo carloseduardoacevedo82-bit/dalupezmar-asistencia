@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Asistencia en Tiempo Real | AGY</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <nav class="glass-nav sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between no-print">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+        <i data-lucide="layout-dashboard" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-200 bg-clip-text text-transparent">
+          AGY Attendance HQ
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">Panel de Monitoreo en Vivo</p>
+      </div>
+    </div>
+
+    <!-- Menú de Enlaces -->
+    <div class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+      <a href="/dashboard.html" class="px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white shadow-md flex items-center gap-2">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+      </a>
+      <a href="/employees.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="users" class="w-4 h-4"></i> Personal
+      </a>
+      <a href="/badge-designer.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="badge-check" class="w-4 h-4"></i> Fotochecks
+      </a>
+      <a href="/kiosk.html" target="_blank" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-cyan-400 hover:bg-cyan-500/10 transition flex items-center gap-2">
+        <i data-lucide="scan" class="w-4 h-4"></i> Modo Kiosco
+      </a>
+      <a href="/reports.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Tareo & Planillas
+      </a>
+    </div>
+
+    <!-- Perfil, Tema y Logout -->
+    <div class="flex items-center gap-3">
+      <!-- Botón Modo Claro / Oscuro -->
+      <button class="btn-theme-toggle p-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700/50 transition flex items-center gap-2" title="Cambiar Modo Claro / Oscuro">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+        <span class="hidden sm:inline text-xs font-bold">Modo Claro</span>
+      </button>
+
+      <div class="text-right hidden sm:block">
+        <p id="nav-user-name" class="text-sm font-semibold text-slate-200">Administrador</p>
+        <p id="nav-user-role" class="text-xs text-blue-400 font-mono">ADMIN</p>
+      </div>
+      <button id="btn-logout" class="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/50 transition">
+        <i data-lucide="log-out" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-8">
+    
+    <!-- CABECERA DEL DASHBOARD: FECHA Y ACCIONES RÁPIDAS -->
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+          Resumen de Asistencia Diaria
+          <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> TIEMPO REAL
+          </span>
+        </h2>
+        <p id="dashboard-date-display" class="text-xs text-slate-400 mt-1">Cargando fecha de jornada...</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button id="btn-refresh-stats" class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold flex items-center gap-2 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i> Actualizar Métricas
+        </button>
+        <a href="/employees.html" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 transition">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Nuevo Colaborador
+        </a>
+      </div>
+    </div>
+
+    <!-- TARJETAS DE KPIS PRINCIPALES (4 COLS) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      
+      <!-- 1. PRESENTES -->
+      <div class="glass-panel p-5 rounded-3xl border border-slate-800 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Presentes Hoy</span>
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-present-count" class="text-3xl font-black text-white font-mono">0</span>
+          <span id="kpi-attendance-rate" class="text-xs font-bold text-emerald-400">0%</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">De un total de <span id="kpi-total-employees" class="font-bold text-slate-200">0</span> trabajadores activos</p>
+      </div>
+
+      <!-- 2. TARDANZAS -->
+      <div class="glass-panel p-5 rounded-3xl border border-slate-800 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tardanzas del Día</span>
+          <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i data-lucide="clock-alert" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-late-count" class="text-3xl font-black text-amber-400 font-mono">0</span>
+          <span class="text-xs font-bold text-slate-400">colaboradores</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Total acumulado: <span id="kpi-late-minutes" class="font-bold text-amber-400 font-mono">0</span> min</p>
+      </div>
+
+      <!-- 3. AUSENTES -->
+      <div class="glass-panel p-5 rounded-3xl border border-slate-800 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Sin Registro / Ausentes</span>
+          <div class="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
+            <i data-lucide="user-x" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-absent-count" class="text-3xl font-black text-rose-400 font-mono">0</span>
+          <span class="text-xs font-bold text-slate-400">pendientes</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Justificados: <span id="kpi-justified-count" class="font-bold text-slate-200">0</span></p>
+      </div>
+
+      <!-- 4. HORAS EXTRAS & JUSTIFICACIONES -->
+      <div class="glass-panel p-5 rounded-3xl border border-slate-800 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Justificaciones</span>
+          <div class="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+            <i data-lucide="file-check" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-pending-justifications" class="text-3xl font-black text-purple-400 font-mono">0</span>
+          <span class="text-xs font-bold text-slate-400">por revisar</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-1">Horas Extras Hoy: <span id="kpi-overtime-minutes" class="font-bold text-cyan-400 font-mono">0h</span></p>
+      </div>
+
+    </div>
+
+    <!-- GRÁFICOS Y ANALÍTICA (8 cols / 4 cols) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Gráfico de Tendencia Semanal de Asistencia -->
+      <div class="lg:col-span-7 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-4 h-4 text-blue-400"></i> Tendencia de Asistencia (Últimos 7 Días)
+            </h3>
+            <p class="text-xs text-slate-400">Histórico de colaboradores puntuales vs tardanzas</p>
+          </div>
+        </div>
+        <div class="h-64 relative">
+          <canvas id="chart-weekly-trend"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfico de Asistencia por Departamento -->
+      <div class="lg:col-span-5 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-cyan-400"></i> Asistencia por Departamento
+          </h3>
+          <p class="text-xs text-slate-400">Cobertura de asistencia de la jornada actual</p>
+        </div>
+        <div class="h-64 relative">
+          <canvas id="chart-departments"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SECCIÓN INFERIOR: FEED EN VIVO Y TABLA DE JUSTIFICACIONES -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Feed de Marcaciones en Vivo (6 cols) -->
+      <div class="lg:col-span-6 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i> Marcaciones Recientes en Tiempo Real
+          </h3>
+          <a href="/kiosk.html" target="_blank" class="text-xs text-cyan-400 hover:underline flex items-center gap-1 font-semibold">
+            Abrir Kiosco <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </a>
+        </div>
+        
+        <div id="dashboard-recent-logs" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+          <div class="text-center py-8 text-slate-500 text-xs">Cargando marcaciones...</div>
+        </div>
+      </div>
+
+      <!-- Bandeja de Solicitudes de Justificación (6 cols) -->
+      <div class="lg:col-span-6 glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="clipboard-check" class="w-4 h-4 text-purple-400"></i> Regularizaciones & Justificaciones
+          </h3>
+          <span class="text-xs text-slate-400">Permisos y descansos médicos</span>
+        </div>
+
+        <div id="dashboard-justifications-list" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+          <div class="text-center py-8 text-slate-500 text-xs">Cargando solicitudes...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL PARA REVISAR JUSTIFICACIÓN -->
+  <div id="modal-review-justification" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i> Revisar Solicitud de Justificación
+        </h3>
+        <button id="btn-close-justif-modal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-2 text-xs bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+        <p><span class="text-slate-400">Colaborador:</span> <b id="justif-modal-emp" class="text-white"></b></p>
+        <p><span class="text-slate-400">Motivo:</span> <b id="justif-modal-reason" class="text-cyan-300"></b></p>
+        <p><span class="text-slate-400">Fechas:</span> <b id="justif-modal-dates" class="text-slate-200"></b></p>
+        <p><span class="text-slate-400">Explicación:</span> <span id="justif-modal-desc" class="text-slate-300 italic block mt-1"></span></p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">Comentario del Evaluador / RRHH</label>
+        <textarea id="justif-modal-comment" rows="2" placeholder="Observaciones u observaciones de aprobación..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-500"></textarea>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="btn-reject-justif" class="flex-1 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition">
+          Rechazar
+        </button>
+        <button id="btn-approve-justif" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition">
+          Aprobar Justificación
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

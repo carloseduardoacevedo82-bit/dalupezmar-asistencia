@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diseñador de Fotochecks | DALUPEZMAR</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- JsBarcode (Code 128) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <!-- html2canvas & jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=2.2">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <nav class="glass-nav sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between no-print">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-slate-900 border border-cyan-500/30 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-7 h-7">
+          <path d="M50 15 C45 35, 30 55, 15 65 C35 60, 45 40, 50 15 Z" fill="#002855"/>
+          <path d="M54 22 C60 40, 75 55, 88 65 C70 62, 58 45, 54 22 Z" fill="#00b4d8"/>
+          <path d="M20 72 C35 68, 65 68, 80 72 C65 78, 35 78, 20 72 Z" fill="#002855"/>
+          <path d="M28 78 C42 75, 58 75, 72 78 C60 83, 40 83, 28 78 Z" fill="#00b4d8"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
+          DALUPEZMAR <span class="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">CREDENTIAL SUITE</span>
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">Emisión, Edición y Personalización de Fotochecks</p>
+      </div>
+    </div>
+
+    <!-- Menú de Enlaces -->
+    <div class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+      <a href="/dashboard.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+      </a>
+      <a href="/employees.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="users" class="w-4 h-4"></i> Personal
+      </a>
+      <a href="/badge-designer.html" class="px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white shadow-md flex items-center gap-2">
+        <i data-lucide="badge-check" class="w-4 h-4"></i> Fotochecks
+      </a>
+      <a href="/kiosk.html" target="_blank" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-cyan-400 hover:bg-cyan-500/10 transition flex items-center gap-2">
+        <i data-lucide="scan" class="w-4 h-4"></i> Modo Kiosco
+      </a>
+      <a href="/reports.html" class="px-3.5 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Tareo & Planillas
+      </a>
+    </div>
+
+    <!-- Perfil, Tema y Logout -->
+    <div class="flex items-center gap-3">
+      <!-- Botón Modo Claro / Oscuro -->
+      <button class="btn-theme-toggle p-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700/50 transition flex items-center gap-2" title="Cambiar Modo Claro / Oscuro">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+        <span class="hidden sm:inline text-xs font-bold">Modo Claro</span>
+      </button>
+
+      <div class="text-right hidden sm:block">
+        <p id="nav-user-name" class="text-sm font-semibold text-slate-200">Administrador</p>
+        <p id="nav-user-role" class="text-xs text-cyan-400 font-mono">DALUPEZMAR ADMIN</p>
+      </div>
+      <button id="btn-logout" class="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/50 transition">
+        <i data-lucide="log-out" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+    
+    <!-- COLUMNA IZQUIERDA: SELECCIÓN Y EDICIÓN RÁPIDA (5 cols) -->
+    <div class="lg:col-span-5 space-y-6 no-print">
+      
+      <!-- Panel de Selección de Empleado -->
+      <div class="glass-panel p-6 rounded-3xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="users" class="w-5 h-5 text-cyan-400"></i> Seleccionar Colaborador
+          </h2>
+          <span id="emp-badge-count" class="text-xs bg-slate-800 text-cyan-300 font-bold px-2.5 py-0.5 rounded-full border border-slate-700">
+            80 Activos
+          </span>
+        </div>
+
+        <!-- Carpetas: Personal Activo vs Personal Cesado / Bajas -->
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <button id="badge-tab-active" onclick="switchBadgeFolder('ACTIVE')" class="py-2 px-3 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 font-bold text-[11px] flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>Personal Activo</span>
+            <span id="badge-count-active-tab" class="px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px]">80</span>
+          </button>
+          <button id="badge-tab-inactive" onclick="switchBadgeFolder('INACTIVE')" class="py-2 px-3 rounded-xl bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer">
+            <i data-lucide="user-x" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span>Bajas / Cesados</span>
+            <span id="badge-count-inactive-tab" class="px-1.5 py-0.5 rounded-full bg-slate-800 text-rose-400 font-black text-[9px]">2</span>
+          </button>
+        </div>
+
+        <!-- Buscador -->
+        <div class="relative mb-4">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
+          <input type="text" id="input-search-employee" placeholder="Buscar por nombre, DNI o cargo..." class="w-full bg-slate-900/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+        </div>
+
+        <!-- Lista de Empleados con Scroll -->
+        <div id="employee-list-container" class="max-h-56 overflow-y-auto space-y-2 pr-1">
+          <div class="text-center py-6 text-slate-400 text-xs">Cargando trabajadores de DALUPEZMAR...</div>
+        </div>
+      </div>
+
+      <!-- PANEL DE EDICIÓN RÁPIDA Y SUBIDA DE FOTO DESDE CELULAR/PC -->
+      <div class="glass-panel p-6 rounded-3xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="user-cog" class="w-5 h-5 text-emerald-400"></i> Modificar Datos y Foto
+          </h2>
+          <span class="text-[11px] text-cyan-400 font-bold">Celular / PC</span>
+        </div>
+
+        <!-- Input para Subir o Tomar Foto con la Cámara del Celular -->
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-2">
+            <i data-lucide="camera" class="w-4 h-4 text-cyan-400"></i> Foto de Perfil (Galería o Cámara)
+          </label>
+          <div class="flex items-center gap-3">
+            <label class="flex-1 cursor-pointer py-3 px-4 rounded-xl border border-dashed border-cyan-500/40 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 transition">
+              <i data-lucide="upload" class="w-4 h-4"></i> Subir / Tomar Foto
+              <input type="file" id="quick-photo-input" accept="image/*" capture="user" class="hidden">
+            </label>
+            <div id="photo-preview-thumb" class="w-12 h-12 rounded-xl border border-slate-700 overflow-hidden bg-slate-900 hidden">
+              <img id="thumb-img" src="" class="w-full h-full object-cover">
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario de Modificación de Datos en Vivo -->
+        <div class="space-y-3 pt-2">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Nombres</label>
+              <input type="text" id="quick-first-name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Apellidos</label>
+              <input type="text" id="quick-last-name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Tipo</label>
+              <select id="quick-doc-type" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold">
+                <option value="DNI">DNI</option>
+                <option value="CEX">CEX</option>
+                <option value="CPP">CPP</option>
+                <option value="PASAPORTE">PASAPORTE</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Número Documento</label>
+              <input type="text" id="quick-doc-number" placeholder="Ej: 77699820" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500 font-bold">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Cargo / Puesto</label>
+            <select id="quick-position" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium">
+              <option value="OPERARIO DE PRODUCCIÓN">OPERARIO DE PRODUCCIÓN</option>
+              <option value="TROQUELADO DE ANILLAS">TROQUELADO DE ANILLAS</option>
+              <option value="AREA EXTERIOR">AREA EXTERIOR</option>
+              <option value="SUPERVISOR DE PLANTA">SUPERVISOR DE PLANTA</option>
+              <option value="SUPERVISOR DE CALIDAD">SUPERVISOR DE CALIDAD</option>
+              <option value="SUPERVISOR DE SEGURIDAD (SST)">SUPERVISOR DE SEGURIDAD (SST)</option>
+              <option value="SUPERVISOR GENERAL">SUPERVISOR GENERAL</option>
+              <option value="JEFE DE PLANTA">JEFE DE PLANTA</option>
+              <option value="JEFE DE PRODUCCIÓN">JEFE DE PRODUCCIÓN</option>
+              <option value="COORDINADOR DE OPERACIONES">COORDINADOR DE OPERACIONES</option>
+              <option value="CONTROL DE CALIDAD">CONTROL DE CALIDAD</option>
+              <option value="ASISTENTE ADMINISTRATIVO">ASISTENTE ADMINISTRATIVO</option>
+              <option value="ENCARGADO DE ALMACÉN">ENCARGADO DE ALMACÉN</option>
+              <option value="TÉCNICO DE MANTENIMIENTO">TÉCNICO DE MANTENIMIENTO</option>
+              <option value="LOGÍSTICA Y DESPACHO">LOGÍSTICA Y DESPACHO</option>
+              <option value="GERENTE GENERAL">GERENTE GENERAL</option>
+              <option value="ESPECIALISTA DE RRHH">ESPECIALISTA DE RRHH</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Sede / Planta Principal</label>
+            <select id="quick-branch" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold text-cyan-300">
+              <option value="1">PECEPE S.A.C. (Planta Principal)</option>
+              <option value="2">Planta Operativa Callao</option>
+              <option value="4">Planta Principal DALUPEZMAR</option>
+              <option value="3">Oficina Remota / Home Office</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Grupo Sanguíneo</label>
+              <select id="quick-blood-type" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="AB+">AB+</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Teléf. Emergencia</label>
+              <input type="text" id="quick-emergency-phone" placeholder="+51 987654321" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <!-- Botón Guardar Cambios -->
+          <button id="btn-save-quick-changes" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition transform active:scale-95">
+            <i data-lucide="save" class="w-4 h-4"></i> Guardar Cambios y Actualizar Fotocheck
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Acciones Adicionales -->
+      <div class="flex gap-3">
+        <button id="btn-regenerate-token" class="flex-1 py-2.5 px-4 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 transition">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i> Regenerar QR
+        </button>
+        <button id="btn-batch-modal" class="flex-1 py-2.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition">
+          <i data-lucide="layers" class="w-4 h-4"></i> Imprimir en Lote (82)
+        </button>
+      </div>
+
+    </div>
+
+    <!-- COLUMNA DERECHA: VISTA PREVIA 3D DE LA CREDENCIAL DALUPEZMAR (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col items-center justify-center">
+      
+      <!-- Controles de Giro y Medidas -->
+      <div class="flex items-center gap-4 mb-6 no-print">
+        <button id="btn-flip-card" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 text-xs font-bold flex items-center gap-2 shadow-lg transition">
+          <i data-lucide="rotate-3d" class="w-4 h-4 text-cyan-400"></i> Girar Credencial (Frente / Dorso)
+        </button>
+        <span class="text-xs text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 font-mono">
+          Formato Estándar CR80 (54mm × 86mm)
+        </span>
+      </div>
+
+      <!-- CONTENEDOR 3D PERSPECTIVA -->
+      <div class="card-perspective">
+        <div id="badge-card-container" class="card-inner relative" style="width: 320px; height: 508px;">
+          
+          <!-- ================= ANVERSO DALUPEZMAR OFICIAL ================= -->
+          <div id="badge-front" class="card-face absolute inset-0 badge-cr80 theme-dalupezmar flex flex-col justify-between overflow-hidden">
+            
+            <!-- Marcas de agua decorativas DALUPEZMAR -->
+            <div class="dalupezmar-watermark top-16 left-2">
+              <svg width="45" height="45" viewBox="0 0 100 100"><path d="M50 15 C45 35, 30 55, 15 65 C35 60, 45 40, 50 15 Z" fill="#002855"/><path d="M54 22 C60 40, 75 55, 88 65 C70 62, 58 45, 54 22 Z" fill="#00b4d8"/></svg>
+            </div>
+            <div class="dalupezmar-watermark top-32 right-2">
+              <svg width="45" height="45" viewBox="0 0 100 100"><path d="M50 15 C45 35, 30 55, 15 65 C35 60, 45 40, 50 15 Z" fill="#002855"/><path d="M54 22 C60 40, 75 55, 88 65 C70 62, 58 45, 54 22 Z" fill="#00b4d8"/></svg>
+            </div>
+            <div class="dalupezmar-watermark bottom-24 left-3">
+              <svg width="45" height="45" viewBox="0 0 100 100"><path d="M50 15 C45 35, 30 55, 15 65 C35 60, 45 40, 50 15 Z" fill="#002855"/><path d="M54 22 C60 40, 75 55, 88 65 C70 62, 58 45, 54 22 Z" fill="#00b4d8"/></svg>
+            </div>
+
+            <!-- Ranura superior de colgador -->
+            <div class="badge-lanyard-hole"></div>
+
+            <!-- Cabecera y Logo Oficial DALUPEZMAR -->
+            <div class="text-center pt-2 px-4 relative z-10">
+              <div class="flex flex-col items-center">
+                <!-- Isotipo Velero -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-12 h-12 drop-shadow-sm">
+                  <path d="M50 12 C44 34, 28 54, 12 65 C34 59, 44 38, 50 12 Z" fill="#002855"/>
+                  <path d="M55 20 C62 38, 77 54, 90 64 C72 61, 60 43, 55 20 Z" fill="#00b4d8"/>
+                  <path d="M18 72 C35 67, 65 67, 82 72 C65 78, 35 78, 18 72 Z" fill="#002855"/>
+                  <path d="M26 78 C42 74, 58 74, 74 78 C60 83, 40 83, 26 78 Z" fill="#00b4d8"/>
+                </svg>
+                <h2 class="text-xl font-black tracking-tight text-[#002855] leading-none mt-1">DALUPEZMAR</h2>
+                <p class="text-[8.5px] font-extrabold tracking-widest text-[#002855] uppercase mt-0.5">SERVICIOS INDUSTRIALES</p>
+              </div>
+            </div>
+
+            <!-- Foto de Perfil con Marco Negro Oficial -->
+            <div class="relative mx-auto my-1 z-10">
+              <div class="w-28 h-32 rounded-2xl overflow-hidden border-[2.5px] border-slate-900 shadow-md bg-white">
+                <img id="badge-photo" src="/uploads/photos/default-avatar.png" alt="Foto Colaborador" class="w-full h-full object-cover">
+              </div>
+              <div id="badge-hologram" class="hologram-seal absolute -bottom-2 -right-2 w-7 h-7 border border-white flex items-center justify-center shadow">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-slate-900 stroke-[2.5]"></i>
+              </div>
+            </div>
+
+            <!-- Nombres, Apellidos y DNI Oficial -->
+            <div class="text-center px-4 z-10 space-y-0.5">
+              <h3 id="badge-fullname" class="dalupezmar-fullname text-base text-[#002855]">
+                MELANIE CORINA<br>ALTAMIRANO SANCHEZ
+              </h3>
+              <p id="badge-doc-number" class="dalupezmar-dni text-lg">
+                DNI: 77699820
+              </p>
+            </div>
+
+            <!-- Micro QR Criptográfico de Alta Seguridad -->
+            <div id="front-qr-box" class="flex items-center justify-center gap-2 pb-14 z-10">
+              <div class="bg-white p-1 rounded-lg shadow-md border border-sky-200 flex items-center gap-1.5">
+                <canvas id="qr-canvas" class="w-11 h-11"></canvas>
+                <div class="text-left pr-1">
+                  <p class="text-[7px] font-bold text-slate-400 uppercase leading-none">CÓDIGO ID</p>
+                  <p id="badge-emp-code" class="text-[9px] font-black text-[#002855] font-mono leading-tight">DAL-1001</p>
+                  <p class="text-[6.5px] text-emerald-600 font-extrabold uppercase mt-0.5">QR VERIFICADO</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Banner Inferior de Cargo -->
+            <div class="dalupezmar-bottom-banner">
+              <span id="badge-position-banner">OPERARIO</span>
+            </div>
+
+          </div>
+
+          <!-- ================= REVERSO OFICIAL DALUPEZMAR ================= -->
+          <div id="badge-back" class="card-face card-face-back absolute inset-0 badge-cr80 theme-dalupezmar p-5 flex flex-col justify-between overflow-hidden">
+            
+            <div class="badge-lanyard-hole"></div>
+
+            <!-- Cabecera Posterior -->
+            <div class="text-center mt-1 z-10">
+              <div class="flex items-center justify-center gap-1.5 mb-1">
+                <svg width="22" height="22" viewBox="0 0 100 100"><path d="M50 15 C45 35, 30 55, 15 65 C35 60, 45 40, 50 15 Z" fill="#002855"/><path d="M54 22 C60 40, 75 55, 88 65 C70 62, 58 45, 54 22 Z" fill="#00b4d8"/></svg>
+                <h4 class="text-[12.5px] font-black tracking-wider text-[#002855] uppercase">DALUPEZMAR S.A.C.</h4>
+              </div>
+              <p class="text-[9px] text-slate-700 leading-tight px-1 font-semibold">
+                Esta credencial es propiedad de DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C. Su uso es obligatorio para el registro diario de asistencia y permanencia en planta. En caso de pérdida comunicarse con los teléfonos: <b class="text-[#002855] font-black">+51 958 544 726 - +51 935 936 168</b>
+              </p>
+            </div>
+
+            <!-- Ficha Médica y de Emergencia -->
+            <div class="bg-sky-50/95 rounded-xl p-3.5 border border-sky-200 space-y-2 text-xs z-10 shadow-sm text-slate-800">
+              <div id="back-blood-container" class="flex justify-between items-center pb-1.5 border-b border-sky-200">
+                <span class="text-[11px] text-slate-700 font-extrabold uppercase">Grupo Sanguíneo:</span>
+                <span id="badge-blood-type" class="text-sm font-black text-rose-600 font-mono">O+</span>
+              </div>
+
+              <div id="back-emergency-container" class="space-y-0.5">
+                <p class="text-[11px] text-slate-700 font-extrabold uppercase">Contacto de Emergencia:</p>
+                <p id="badge-emergency-name" class="text-[12px] font-bold text-[#002855] truncate">Familiar Directo</p>
+                <p id="badge-emergency-phone" class="text-[13px] font-mono text-[#0284c7] font-black">+51 911111111</p>
+              </div>
+
+              <div class="pt-1.5 border-t border-sky-200 flex justify-between items-center text-[10.5px] text-slate-700">
+                <span>Planta: <b class="text-[#002855] font-black">PECEPE S.A.C.</b></span>
+                <span>Área: <b id="badge-department" class="text-[#002855] font-bold">Producción</b></span>
+              </div>
+            </div>
+
+            <!-- Código de Barras (Code 128) -->
+            <div class="bg-white rounded-xl p-2 text-center text-slate-900 border border-slate-200 shadow-inner z-10 flex items-center justify-center">
+              <svg id="barcode-svg" class="w-full h-16"></svg>
+            </div>
+
+            <!-- Pie de Reverso Oficial DALUPEZMAR -->
+            <div class="text-center text-[9px] text-slate-800 z-10 pb-1 px-1 leading-tight font-bold">
+              <p class="font-black text-[#002855]">DALUPEZMAR S.A.C. • RUC N° 20615714128</p>
+              <p class="text-slate-600 mt-0.5 text-[8px]">P.J. Calle Asoc De Fam Santa Rosa De Villa Lomo De Corvina Mz.F, Lt 2, Villa El Salvador</p>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      <!-- BOTONES DE ACCIÓN PARA EXPORTACIÓN E IMPRESIÓN -->
+      <div class="mt-8 flex flex-wrap gap-4 justify-center no-print">
+        <button id="btn-print-single" class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-blue-500/25 flex items-center gap-2.5 transition transform hover:-translate-y-0.5">
+          <i data-lucide="printer" class="w-5 h-5"></i> Imprimir Fotocheck Actual
+        </button>
+        <button id="btn-download-pdf" class="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold text-sm shadow-lg flex items-center gap-2.5 transition transform hover:-translate-y-0.5">
+          <i data-lucide="file-down" class="w-5 h-5 text-cyan-400"></i> Descargar PDF Alta Calidad
+        </button>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL DE EMISIÓN EN LOTE (BATCH PRINT 82 TRABAJADORES) -->
+  <div id="modal-batch" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-2xl w-full border border-slate-700 shadow-2xl space-y-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="layers" class="w-5 h-5 text-cyan-400"></i> Emisión Masiva de Fotochecks (Hoja A4)
+        </h3>
+        <button id="btn-close-batch-modal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-sm text-slate-300">
+        Genera planchas de impresión A4 con el formato oficial de DALUPEZMAR y líneas de corte para todo el personal de planta.
+      </p>
+
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+          <input type="checkbox" id="batch-select-all" checked class="w-4 h-4 text-cyan-600 rounded bg-slate-900 border-slate-700">
+          <span>Seleccionar Todos (<span id="batch-total-count">82</span>)</span>
+        </label>
+        <span id="batch-selected-count" class="text-xs text-cyan-400 font-bold">82 seleccionados</span>
+      </div>
+
+      <div id="batch-employee-list" class="max-h-64 overflow-y-auto space-y-2 pr-1"></div>
+
+      <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
+        <button id="btn-cancel-batch" class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold text-sm transition">
+          Cancelar
+        </button>
+        <button id="btn-generate-batch-print" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/30 flex items-center gap-2 transition">
+          <i data-lucide="printer" class="w-4 h-4"></i> Generar Planchas de Impresión A4
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=2.4"></script>
+  <script src="/js/auth.js?v=2.4"></script>
+  <script src="/js/badge.js?v=2.4"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

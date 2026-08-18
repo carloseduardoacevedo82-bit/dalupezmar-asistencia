@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiosco de Asistencia en Tiempo Real | AGY</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    #reader {
+      border: none !important;
+      background: #000;
+    }
+    #reader video {
+      border-radius: 1.25rem;
+      object-fit: cover;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    #reader__scan_region {
+      background: transparent !important;
+    }
+    #reader__dashboard {
+      padding: 0 !important;
+    }
+    .scanner-laser {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #06b6d4, #3b82f6, transparent);
+      box-shadow: 0 0 15px #06b6d4, 0 0 30px #3b82f6;
+      animation: scanLaser 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes scanLaser {
+      0% { top: 5%; opacity: 0; }
+      15% { opacity: 1; }
+      85% { opacity: 1; }
+      100% { top: 95%; opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+  <!-- CABECERA SUPERIOR DEL KIOSCO -->
+  <header class="glass-nav px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+        <i data-lucide="scan-face" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
+          KIOSCO DE ASISTENCIA <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">EN VIVO</span>
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">CORPORACIÓN GLOBAL TECH S.A.C. • Sede Central</p>
+      </div>
+    </div>
+
+    <!-- Reloj Digital Gigante en Tiempo Real -->
+    <div class="flex items-center gap-6">
+      <div class="text-right">
+        <div id="live-clock" class="text-3xl lg:text-4xl font-black font-mono tracking-wider text-cyan-300 drop-shadow-md">
+          --:--:--
+        </div>
+        <p id="live-date" class="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          Cargando fecha...
+        </p>
+      </div>
+
+      <!-- Botón Tema, Pantalla Completa & Config -->
+      <div class="flex items-center gap-2">
+        <button class="btn-theme-toggle p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700 transition" title="Cambiar Modo Claro / Oscuro">
+          <i data-lucide="sun" class="w-5 h-5"></i>
+        </button>
+        <button id="btn-fullscreen" title="Pantalla Completa" class="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          <i data-lucide="maximize" class="w-5 h-5"></i>
+        </button>
+        <a href="/dashboard.html" title="Ir al Panel Administrativo" class="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          <i data-lucide="layout-grid" class="w-5 h-5"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL: ESCÁNER Y ÚLTIMAS MARCACIONES -->
+  <main class="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+    
+    <!-- COLUMNA IZQUIERDA: CÁMARA Y MODO DE MARCACIÓN (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col items-center space-y-6">
+      
+      <!-- Selector Rápido de Tipo de Marcación -->
+      <div class="w-full max-w-md bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 flex gap-1 shadow-xl">
+        <button type="button" data-punch="AUTO" class="punch-mode-btn flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow-lg">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Automático
+        </button>
+        <button type="button" data-punch="ENTRY" class="punch-mode-btn flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+          <i data-lucide="log-in" class="w-3.5 h-3.5 text-emerald-400"></i> Entrada
+        </button>
+        <button type="button" data-punch="LUNCH_START" class="punch-mode-btn flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+          <i data-lucide="utensils" class="w-3.5 h-3.5 text-amber-400"></i> Refrigerio
+        </button>
+        <button type="button" data-punch="EXIT" class="punch-mode-btn flex-1 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white">
+          <i data-lucide="log-out" class="w-3.5 h-3.5 text-rose-400"></i> Salida
+        </button>
+      </div>
+
+      <!-- VISOR DEL ESCÁNER POR CÁMARA WEB / MÓVIL -->
+      <div class="relative w-full max-w-md aspect-[4/3] rounded-3xl overflow-hidden border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/20 bg-black flex items-center justify-center">
+        
+        <!-- Contenedor del video HTML5-QRCode -->
+        <div id="reader" class="w-full h-full"></div>
+
+        <!-- Línea Láser Animada -->
+        <div class="scanner-laser"></div>
+
+        <!-- Marco de Guía Visual de Enfoque -->
+        <div class="absolute inset-8 border-2 border-dashed border-cyan-400/40 rounded-2xl pointer-events-none flex flex-col justify-between p-3">
+          <div class="flex justify-between">
+            <span class="w-6 h-6 border-t-4 border-l-4 border-cyan-400 rounded-tl-lg"></span>
+            <span class="w-6 h-6 border-t-4 border-r-4 border-cyan-400 rounded-tr-lg"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="w-6 h-6 border-b-4 border-l-4 border-cyan-400 rounded-bl-lg"></span>
+            <span class="w-6 h-6 border-b-4 border-r-4 border-cyan-400 rounded-br-lg"></span>
+          </div>
+        </div>
+
+        <!-- Selector de Cámara (si hay múltiples) -->
+        <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3 py-2 bg-slate-950/80 backdrop-blur-md rounded-xl border border-slate-800 text-xs">
+          <div class="flex items-center gap-2 text-slate-300">
+            <i data-lucide="camera" class="w-4 h-4 text-cyan-400"></i>
+            <select id="camera-select" class="bg-transparent text-white font-medium focus:outline-none cursor-pointer">
+              <option value="">Iniciando cámara...</option>
+            </select>
+          </div>
+          <span class="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> LISTO
+          </span>
+        </div>
+
+      </div>
+
+      <!-- Botón Marcación Manual / Teclado Numérico -->
+      <div class="flex items-center gap-3">
+        <button id="btn-manual-punch" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold flex items-center gap-2 shadow-lg transition">
+          <i data-lucide="keyboard" class="w-4 h-4 text-cyan-400"></i> Marcación por DNI / Teclado
+        </button>
+        <span class="text-xs text-slate-400">o acerque su carnet a la cámara</span>
+      </div>
+
+    </div>
+
+    <!-- COLUMNA DERECHA: TARJETA DE CONFIRMACIÓN EN VIVO Y HISTORIAL DEL DÍA (5 cols) -->
+    <div class="lg:col-span-5 space-y-6">
+      
+      <!-- TARJETA DE CONFIRMACIÓN INSTANTÁNEA (RESULTADO DE MARCACIÓN) -->
+      <div id="punch-result-card" class="glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl transition-all duration-300 hidden">
+        <div class="flex items-start gap-4">
+          <div class="relative">
+            <img id="res-emp-photo" src="/uploads/photos/default-avatar.png" class="w-20 h-20 rounded-2xl object-cover border-2 border-cyan-400 shadow-lg" alt="Foto">
+            <span id="res-badge-status-icon" class="absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm shadow">
+              <i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>
+            </span>
+          </div>
+          <div class="flex-1 space-y-1">
+            <span id="res-punch-tag" class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              ENTRADA REGISTRADA
+            </span>
+            <h3 id="res-emp-name" class="text-lg font-black text-white leading-tight">Carlos Alberto Mendoza</h3>
+            <p id="res-emp-position" class="text-xs font-semibold text-cyan-300">Arquitecto de Software</p>
+            <p id="res-emp-dept" class="text-[11px] text-slate-400">Tecnología e Innovación</p>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs">
+          <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+            <p class="text-[10px] text-slate-400 font-bold uppercase">Hora Marcación</p>
+            <p id="res-punch-time" class="text-sm font-black text-cyan-300 font-mono">08:29:45 AM</p>
+          </div>
+          <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+            <p class="text-[10px] text-slate-400 font-bold uppercase">Estado de Horario</p>
+            <p id="res-punch-note" class="text-xs font-black text-emerald-400">Puntual (Sin tardanza)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEED DE ÚLTIMAS MARCACIONES DEL DÍA -->
+      <div class="glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl">
+        <h3 class="text-sm font-bold text-white mb-4 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i> Marcaciones Recientes
+          </span>
+          <span id="total-punches-today" class="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full font-mono">
+            0 hoy
+          </span>
+        </h3>
+
+        <!-- Lista de logs -->
+        <div id="live-logs-container" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+          <div class="text-center py-8 text-slate-500 text-xs">
+            Esperando primeras marcaciones de la jornada...
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL PARA MARCACIÓN MANUAL POR DNI -->
+  <div id="modal-manual-punch" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-sm w-full border border-slate-700 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="hash" class="w-5 h-5 text-cyan-400"></i> Marcación por Teclado
+        </h3>
+        <button id="btn-close-manual-modal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1.5">Número de DNI / Código de Fotocheck</label>
+        <input type="text" id="manual-input-code" placeholder="Ej: 45892147 o EMP-1001" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono font-bold text-white tracking-widest focus:outline-none focus:border-cyan-500">
+      </div>
+
+      <!-- Teclado Numérico Virtual en Pantalla -->
+      <div class="grid grid-cols-3 gap-2">
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">1</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">2</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">3</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">4</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">5</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">6</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">7</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">8</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">9</button>
+        <button type="button" id="key-clear" class="p-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-xl text-xs font-bold text-rose-400">BORRAR</button>
+        <button type="button" class="key-btn p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-base font-bold text-white">0</button>
+        <button type="button" id="key-backspace" class="p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold text-slate-300">⌫</button>
+      </div>
+
+      <button id="btn-submit-manual-punch" class="w-full py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-sm shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition">
+        <i data-lucide="fingerprint" class="w-5 h-5"></i> Confirmar Marcación
+      </button>
+    </div>
+  </div>
+
+  <!-- PIE DEL KIOSCO -->
+  <footer class="p-4 text-center text-xs text-slate-500">
+    AGY Smart Attendance Suite • Reconocimiento de Credenciales QR y Códigos 128
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/kiosk.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
