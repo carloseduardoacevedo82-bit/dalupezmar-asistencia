@@ -24,7 +24,7 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Sincronización y auditoría de personal y bajas oficiales de DALUPEZMAR
+// Sincronización y auditoría de personal, puestos y bajas oficiales de DALUPEZMAR
 try {
   // 1. Eliminar registros de prueba demo residuales
   db.prepare(`
@@ -35,7 +35,73 @@ try {
        OR last_name LIKE '%Prueba%'
   `).run();
 
-  // 2. Establecer el estado INACTIVE para los 8 trabajadores dados de baja procesados
+  // 2. Asegurar existencia de cargos oficiales
+  let posTroquelado = db.prepare("SELECT id FROM positions WHERE name = 'TROQUELADO DE ANILLAS'").get();
+  if (!posTroquelado) {
+    const res = db.prepare("INSERT INTO positions (department_id, name, description, is_active) VALUES (5, 'TROQUELADO DE ANILLAS', 'Operador de Prensa y Troquelado de Anillas', 1)").run();
+    posTroquelado = { id: res.lastInsertRowid };
+  }
+
+  let posExterior = db.prepare("SELECT id FROM positions WHERE name = 'AREA EXTERIOR'").get();
+  if (!posExterior) {
+    const res = db.prepare("INSERT INTO positions (department_id, name, description, is_active) VALUES (5, 'AREA EXTERIOR', 'Personal Operativo de Área Exterior y Logística', 1)").run();
+    posExterior = { id: res.lastInsertRowid };
+  }
+
+  let posGerente = db.prepare("SELECT id FROM positions WHERE name = 'GERENTE GENERAL'").get();
+  if (!posGerente) {
+    const res = db.prepare("INSERT INTO positions (department_id, name, description, is_active) VALUES (5, 'GERENTE GENERAL', 'Dirección General de la Empresa', 1)").run();
+    posGerente = { id: res.lastInsertRowid };
+  }
+
+  let posSupervisor = db.prepare("SELECT id FROM positions WHERE name = 'SUPERVISOR GENERAL'").get();
+  if (!posSupervisor) {
+    const res = db.prepare("INSERT INTO positions (department_id, name, description, is_active) VALUES (5, 'SUPERVISOR GENERAL', 'Supervisión General de Planta y Operaciones', 1)").run();
+    posSupervisor = { id: res.lastInsertRowid };
+  }
+
+  // 3. Asignar colaboradores de TROQUELADO DE ANILLAS
+  const dnisTroquelado = [
+    '77699820', // Melanie Corina Altamirano Sanchez
+    '77478525', // Segundo Angel Armas Muena
+    '41859381', // Jose Bautista Lupuche
+    '63401773', // Dempster Cahuaza Muena
+    '60948067', // Joel Dario Fernandez Bobadilla
+    '70348540', // David Fernandez Venero
+    '45606571', // María Elisabeth Flores Ruiz
+    '48046198', // Marcos Abel Ochavano Lomas
+    '48592444', // Sandra Ortega Narciso
+    '62698406', // Rebeca Panaifo Perez
+    '75216072', // Sandy Estefany Sanchez Godoy
+    '71806451'  // Jean Franco Sanchez Llamoza
+  ];
+  const updateTroquelado = db.prepare("UPDATE employees SET position_id = ? WHERE document_number = ?");
+  dnisTroquelado.forEach(dni => updateTroquelado.run(posTroquelado.id, dni));
+
+  // 4. Asignar colaboradores de ÁREA EXTERIOR
+  const dnisExterior = [
+    '78706411',  // Richard Apagueño Panaifo
+    '43046174',  // Charly Arnold Arevalo Henderson
+    '80424858',  // Edwin Cahuaza Vasquez
+    '61946516',  // Giancarlo Martin Cornejo Zeña
+    '008270860', // Davis Gabriel Gonzalez Fernandez
+    '61376102',  // Lourdes Rosa Manrique Romani
+    '009424087', // Julio Cesar Medina Risso
+    '73119775',  // Leonardo Mozombite Yuyarima
+    '45014861',  // Jonathan Roque Bayes
+    '61089730'   // Felipe Rosales Chavez
+  ];
+  const updateExterior = db.prepare("UPDATE employees SET position_id = ? WHERE document_number = ?");
+  dnisExterior.forEach(dni => updateExterior.run(posExterior.id, dni));
+
+  // 5. Asignar Gerencia y Supervisores
+  const updateGerente = db.prepare("UPDATE employees SET position_id = ? WHERE document_number = ?");
+  ['78019216', '80184449'].forEach(dni => updateGerente.run(posGerente.id, dni));
+
+  const updateSup = db.prepare("UPDATE employees SET position_id = ? WHERE document_number = ?");
+  ['005704276', '003011701'].forEach(dni => updateSup.run(posSupervisor.id, dni));
+
+  // 6. Establecer el estado INACTIVE para los 8 trabajadores dados de baja procesados
   const bajasDnis = [
     '40811097',  // Mirtha Karina Castro Ubaldo
     '60948067',  // Joel Dario Fernandez Bobadilla
@@ -52,6 +118,7 @@ try {
     updateBaja.run(dni);
   }
   db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  console.log('✅ Sincronización oficial DALUPEZMAR: Puestos y bajas aplicados con éxito.');
 } catch (syncErr) {
   console.log('Nota de sincronización de personal:', syncErr.message);
 }
