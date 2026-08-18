@@ -2,13 +2,14 @@ const db = require('./database');
 const { generateSecureQrToken, generateBarcodeValue } = require('../src/utils/badgeGenerator');
 
 function ensureAllWorkersHavePersonalQr() {
-  console.log('🔍 Verificando asignación de Códigos QR Personales a todos los trabajadores...');
+  console.log('🔍 Sincronizando Códigos QR Personales únicos para todos los trabajadores...');
+
+  // Limpiar badges existentes para evitar duplicados
+  db.prepare('DELETE FROM badges').run();
 
   const employees = db.prepare('SELECT id, employee_code, document_number, first_name, last_name, status FROM employees').all();
   let createdBadges = 0;
-  let verifiedBadges = 0;
 
-  const findBadge = db.prepare("SELECT id, qr_token_hash FROM badges WHERE employee_id = ? AND status = 'ACTIVE'");
   const insertBadge = db.prepare(`
     INSERT INTO badges (
       employee_id, badge_code, qr_token_hash, barcode_value,
@@ -17,22 +18,16 @@ function ensureAllWorkersHavePersonalQr() {
   `);
 
   for (const emp of employees) {
-    const activeBadge = findBadge.get(emp.id);
+    const qrHash = `AGY_SEC_QR_${emp.employee_code}_${emp.document_number}`;
+    const barcodeVal = emp.document_number;
+    const badgeCode = `BADGE-${emp.employee_code}`;
 
-    if (!activeBadge || !activeBadge.qr_token_hash) {
-      const qrHash = generateSecureQrToken(emp.id, emp.employee_code);
-      const barcodeVal = generateBarcodeValue(emp.document_number);
-      insertBadge.run(emp.id, `BADGE-${emp.employee_code}`, qrHash, barcodeVal);
-      createdBadges++;
-    } else {
-      verifiedBadges++;
-    }
+    insertBadge.run(emp.id, badgeCode, qrHash, barcodeVal);
+    createdBadges++;
   }
 
-  console.log(`✅ Total trabajadores inspeccionados: ${employees.length}`);
-  console.log(`🛡️ Credenciales QR activas verificadas: ${verifiedBadges}`);
-  console.log(`🆕 Nuevos Códigos QR personales generados: ${createdBadges}`);
-  console.log('🎉 100% de los colaboradores cuentan con Código QR Personal Único.');
+  db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+  console.log(`✅ Sincronizadas ${createdBadges} Credenciales Oficiales con Códigos QR y de Barras únicos.`);
 }
 
 ensureAllWorkersHavePersonalQr();

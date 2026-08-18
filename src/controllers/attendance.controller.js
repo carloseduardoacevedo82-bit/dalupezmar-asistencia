@@ -21,7 +21,31 @@ const punch = (req, res) => {
       return errorResponse(res, 'Token, código QR o documento requerido para marcar asistencia.', null, 400);
     }
 
-    const trimmed = token.trim();
+    const raw = String(token).trim();
+
+    // Extraer identificadores posibles del token escaneado
+    // Soporta: QR frontal completo (AGY_SEC_QR_DAL-1002_77699820), DNI (77699820), Código (DAL-1002), o URL
+    let extractedDni = raw;
+    let extractedCode = raw;
+
+    if (raw.includes('AGY_SEC_QR_')) {
+      const parts = raw.replace('AGY_SEC_QR_', '').split('_');
+      if (parts.length >= 2) {
+        extractedCode = parts[0];
+        extractedDni = parts[1];
+      } else if (parts.length === 1) {
+        extractedDni = parts[0];
+      }
+    } else if (raw.includes('?id=')) {
+      const idMatch = raw.match(/id=([0-9]+)/);
+      if (idMatch) extractedCode = idMatch[1];
+    } else {
+      // Buscar si contiene secuencia de 8 o 9 dígitos (DNI/CEX)
+      const numMatch = raw.match(/[0-9]{8,9}/);
+      if (numMatch) {
+        extractedDni = numMatch[0];
+      }
+    }
 
     // 1. Identificar al empleado y su turno activo
     const empQuery = `
@@ -50,23 +74,35 @@ const punch = (req, res) => {
         s.tolerance_minutes as shift_tolerance,
         s.lunch_duration_minutes
       FROM employees e
-      LEFT JOIN badges bg ON e.id = bg.employee_id AND bg.status = 'ACTIVE'
+      LEFT JOIN badges bg ON e.id = bg.employee_id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
       LEFT JOIN shifts s ON e.shift_id = s.id
-      WHERE (bg.qr_token_hash = ? OR bg.barcode_value = ? OR bg.badge_code = ? OR e.document_number = ? OR e.employee_code = ?)
-      ORDER BY bg.id DESC LIMIT 1
+      WHERE (
+        bg.qr_token_hash = ? 
+        OR bg.barcode_value = ? 
+        OR bg.badge_code = ? 
+        OR e.document_number = ? 
+        OR e.document_number = ?
+        OR e.employee_code = ? 
+        OR e.employee_code = ?
+        OR e.id = ?
+        OR ? LIKE '%' || e.document_number || '%'
+      )
+      ORDER BY e.status ASC, bg.id DESC LIMIT 1
     `;
 
-    const emp = db.prepare(empQuery).get(trimmed, trimmed, trimmed, trimmed, trimmed);
+    const emp = db.prepare(empQuery).get(
+      raw, raw, raw, raw, extractedDni, raw, extractedCode, Number(extractedCode) || 0, raw
+    );
 
     if (!emp) {
-      return errorResponse(res, 'Credencial o código no reconocido. No se encontró el trabajador.', null, 404);
+      return errorResponse(res, `Código no reconocido (${raw}). No se encontró trabajador asociado.`, null, 404);
     }
 
     if (emp.employee_status !== 'ACTIVE') {
-      return errorResponse(res, `Trabajador en estado ${emp.employee_status}. Marcación denegada.`, null, 403);
+      return errorResponse(res, `Trabajador en estado ${emp.employee_status} (Cesado/Baja). Marcación denegada.`, null, 403);
     }
 
     // 2. Validación de Geocerca GPS (si aplica para marcación remota/móvil)
@@ -80,7 +116,7 @@ const punch = (req, res) => {
         Number(emp.branch_lat),
         Number(emp.branch_lng)
       );
-      if (distanceToBranch > (emp.branch_radius || 200)) {
+      if (distanceToBranch > (emp.branch_radius || 500)) {
         isWithinGeofence = 0;
       }
     }
@@ -92,8 +128,11 @@ const punch = (req, res) => {
 
     let attendance = db.prepare('SELECT * FROM attendances WHERE employee_id = ? AND attendance_date = ?').get(emp.employee_id, todayStr);
 
+    const defaultShiftExit = emp.shift_exit_time || '19:00:00';
+    const defaultShiftEntry = emp.shift_entry_time || '07:00:00';
+
     if (!attendance) {
-      // Crear registro diario
+      // Crear registro diario inicial
       const insertAtt = db.prepare(`
         INSERT INTO attendances (
           employee_id, attendance_date, shift_id, status,
@@ -105,14 +144,14 @@ const punch = (req, res) => {
         emp.employee_id,
         todayStr,
         emp.shift_id,
-        emp.shift_entry_time || '08:30:00',
-        emp.shift_exit_time || '17:30:00'
+        defaultShiftEntry,
+        defaultShiftExit
       );
 
       attendance = db.prepare('SELECT * FROM attendances WHERE id = ?').get(resultAtt.lastInsertRowid);
     }
 
-    // 4. Determinar tipo de marcación (si viene 'AUTO' o no viene especificado)
+    // 4. Determinar tipo de marcación inteligente
     let resolvedType = punch_type;
 
     if (!resolvedType || resolvedType === 'AUTO') {
@@ -127,7 +166,7 @@ const punch = (req, res) => {
       }
     }
 
-    // 5. Insertar log individual de marcación
+    // 5. Insertar log individual de marcación con GPS
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
     const insertLog = db.prepare(`
       INSERT INTO attendance_logs (
@@ -147,14 +186,14 @@ const punch = (req, res) => {
       isWithinGeofence,
       device_info || null,
       ip,
-      trimmed
+      raw
     );
 
-    // 6. Actualizar la jornada diaria y calcular tardanzas / horas
+    // 6. Actualizar la jornada diaria y calcular tardanzas / horas trabajadas hasta las 19:00
     let updatedStatus = attendance.status;
-    let tardinessMinutes = attendance.total_minutes_late;
-    let workedMinutes = attendance.total_minutes_worked;
-    let overtimeMinutes = attendance.total_minutes_overtime;
+    let tardinessMinutes = attendance.total_minutes_late || 0;
+    let workedMinutes = attendance.total_minutes_worked || 0;
+    let overtimeMinutes = attendance.total_minutes_overtime || 0;
     let firstEntry = attendance.first_entry_time;
     let lunchStart = attendance.lunch_start_time;
     let lunchEnd = attendance.lunch_end_time;
@@ -163,9 +202,12 @@ const punch = (req, res) => {
 
     if (resolvedType === 'ENTRY') {
       firstEntry = nowIso;
-      // Calcular tardanza
-      tardinessMinutes = calculateTardiness(now, emp.shift_entry_time || '08:30:00', emp.shift_tolerance || 15);
+      // Calcular tardanza según tolerancia del turno
+      tardinessMinutes = calculateTardiness(now, defaultShiftEntry, emp.shift_tolerance || 15);
       updatedStatus = tardinessMinutes > 0 ? 'LATE' : 'PRESENT';
+      
+      // Cálculo proyectado de jornada operativa de 07:00 a 19:00 (11 horas efectivas descontando 1h refrigerio)
+      workedMinutes = 660; // 11 horas estándar hasta las 19:00
     } else if (resolvedType === 'LUNCH_START') {
       lunchStart = nowIso;
     } else if (resolvedType === 'LUNCH_END') {
@@ -174,7 +216,7 @@ const punch = (req, res) => {
       lastExit = nowIso;
       if (firstEntry) {
         workedMinutes = calculateWorkedMinutes(firstEntry, nowIso, emp.lunch_duration_minutes || 60);
-        overtimeMinutes = calculateOvertime(now, emp.shift_exit_time || '17:30:00');
+        overtimeMinutes = calculateOvertime(now, defaultShiftExit);
         isComplete = 1;
       }
     }
@@ -215,7 +257,7 @@ const punch = (req, res) => {
 
     let msg = `¡${typeNames[resolvedType] || resolvedType} confirmada!`;
     if (resolvedType === 'ENTRY' && tardinessMinutes > 0) {
-      msg += ` (Tardanza detectada: ${tardinessMinutes} minutos)`;
+      msg += ` (Tardanza: ${tardinessMinutes} min)`;
     }
 
     return successResponse(res, msg, {
@@ -234,12 +276,135 @@ const punch = (req, res) => {
         source: punch_source,
         tardiness_minutes: tardinessMinutes,
         is_within_geofence: isWithinGeofence === 1,
-        distance_meters: distanceToBranch
+        distance_meters: distanceToBranch,
+        latitude: latitude || null,
+        longitude: longitude || null
       }
     });
   } catch (error) {
     console.error('Error en marcación de asistencia:', error);
     return errorResponse(res, 'Error al procesar la marcación de asistencia.', error.message);
+  }
+};
+
+/**
+ * Modificar horario y estado de una marcación/asistencia
+ */
+const updateAttendanceRecord = (req, res) => {
+  try {
+    const { id } = req.params;
+    const { first_entry_time, lunch_start_time, lunch_end_time, last_exit_time, status, total_minutes_worked } = req.body;
+
+    const existing = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
+    if (!existing) {
+      return errorResponse(res, 'Registro de asistencia no encontrado.', null, 404);
+    }
+
+    let calculatedWorked = total_minutes_worked;
+    if (calculatedWorked === undefined || calculatedWorked === null) {
+      if (first_entry_time && last_exit_time) {
+        calculatedWorked = calculateWorkedMinutes(first_entry_time, last_exit_time, 60);
+      } else if (first_entry_time) {
+        calculatedWorked = 660; // 11 horas estándar hasta las 19:00
+      } else {
+        calculatedWorked = 0;
+      }
+    }
+
+    db.prepare(`
+      UPDATE attendances SET
+        first_entry_time = ?,
+        lunch_start_time = ?,
+        lunch_end_time = ?,
+        last_exit_time = ?,
+        status = ?,
+        total_minutes_worked = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      first_entry_time || existing.first_entry_time,
+      lunch_start_time || existing.lunch_start_time,
+      lunch_end_time || existing.lunch_end_time,
+      last_exit_time || existing.last_exit_time,
+      status || existing.status,
+      calculatedWorked,
+      id
+    );
+
+    return successResponse(res, 'Registro de asistencia actualizado exitosamente.');
+  } catch (error) {
+    return errorResponse(res, 'Error al actualizar asistencia.', error.message);
+  }
+};
+
+/**
+ * Eliminar una marcación/asistencia errónea
+ */
+const deleteAttendanceRecord = (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
+    if (!existing) {
+      return errorResponse(res, 'Registro de asistencia no encontrado.', null, 404);
+    }
+
+    db.prepare('DELETE FROM attendance_logs WHERE attendance_id = ?').run(id);
+    db.prepare('DELETE FROM attendances WHERE id = ?').run(id);
+
+    return successResponse(res, 'Marcación eliminada exitosamente.');
+  } catch (error) {
+    return errorResponse(res, 'Error al eliminar marcación.', error.message);
+  }
+};
+
+/**
+ * Registrar asistencia manual para un trabajador (Supervisor / Administrador)
+ */
+const createManualAttendance = (req, res) => {
+  try {
+    const { employee_id, attendance_date, first_entry_time, last_exit_time, status = 'PRESENT' } = req.body;
+
+    if (!employee_id || !attendance_date) {
+      return errorResponse(res, 'ID de empleado y fecha requeridos.', null, 400);
+    }
+
+    const emp = db.prepare('SELECT * FROM employees WHERE id = ?').get(employee_id);
+    if (!emp) {
+      return errorResponse(res, 'Trabajador no encontrado.', null, 404);
+    }
+
+    let calculatedWorked = 660; // 11 horas hasta las 19:00
+    if (first_entry_time && last_exit_time) {
+      calculatedWorked = calculateWorkedMinutes(first_entry_time, last_exit_time, 60);
+    }
+
+    const existing = db.prepare('SELECT id FROM attendances WHERE employee_id = ? AND attendance_date = ?').get(employee_id, attendance_date);
+
+    if (existing) {
+      db.prepare(`
+        UPDATE attendances SET
+          first_entry_time = ?,
+          last_exit_time = ?,
+          status = ?,
+          total_minutes_worked = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(first_entry_time, last_exit_time, status, calculatedWorked, existing.id);
+
+      return successResponse(res, 'Asistencia manual actualizada para el colaborador.', { id: existing.id });
+    } else {
+      const resIns = db.prepare(`
+        INSERT INTO attendances (
+          employee_id, attendance_date, shift_id, status,
+          expected_entry, expected_exit, first_entry_time, last_exit_time, total_minutes_worked, is_complete
+        ) VALUES (?, ?, ?, ?, '07:00:00', '19:00:00', ?, ?, ?, 1)
+      `).run(employee_id, attendance_date, emp.shift_id || 4, status, first_entry_time, last_exit_time, calculatedWorked);
+
+      return successResponse(res, 'Asistencia manual registrada exitosamente.', { id: resIns.lastInsertRowid }, 201);
+    }
+  } catch (error) {
+    return errorResponse(res, 'Error al crear asistencia manual.', error.message);
   }
 };
 
@@ -443,6 +608,9 @@ module.exports = {
   punch,
   getTodayLogs,
   getAttendanceReport,
+  updateAttendanceRecord,
+  deleteAttendanceRecord,
+  createManualAttendance,
   getJustifications,
   createJustification,
   reviewJustification

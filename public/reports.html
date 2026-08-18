@@ -201,11 +201,16 @@
       </div>
     </div>
 
-    <!-- BOTONES DE EXPORTACIÓN -->
+    <!-- BOTONES DE EXPORTACIÓN Y ACCIONES -->
     <div class="flex flex-wrap items-center justify-between gap-4 no-print">
-      <h3 class="text-sm font-bold text-white flex items-center gap-2">
-        <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i> Tabla Consolidada de Tareo
-      </h3>
+      <div class="flex items-center gap-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i> Tabla Consolidada de Tareo
+        </h3>
+        <button id="btn-open-manual-att" class="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 transition">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> Registrar Asistencia Manual
+        </button>
+      </div>
 
       <div class="flex items-center gap-3">
         <button id="btn-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition">
@@ -237,12 +242,13 @@
               <th class="px-4 py-3.5 text-center">Tardanza</th>
               <th class="px-4 py-3.5 text-center">H. Extras</th>
               <th class="px-4 py-3.5 text-center">Estado</th>
+              <th class="px-4 py-3.5 text-center no-print">Acciones</th>
             </tr>
           </thead>
           <tbody id="report-table-body" class="divide-y divide-slate-800/60 font-mono">
             <tr>
-              <td colspan="11" class="px-6 py-8 text-center text-slate-500 font-sans">
-                Selecciona un rango de fechas y presiona "Consultar Tareo".
+              <td colspan="12" class="px-6 py-8 text-center text-slate-500 font-sans">
+                Selecciona un rango de fechas y presiona "Consultar Rango".
               </td>
             </tr>
           </tbody>
@@ -252,10 +258,124 @@
 
   </main>
 
+  <!-- MODAL PARA MODIFICAR HORAS / ASISTENCIA -->
+  <div id="modal-edit-attendance" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-4 h-4 text-blue-400"></i> Modificar Marcación de Asistencia
+        </h3>
+        <button id="btn-close-edit-att" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-edit-attendance" class="space-y-4">
+        <input type="hidden" id="edit-att-id">
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Colaborador</label>
+          <p id="edit-att-emp-name" class="text-xs font-black text-white bg-slate-900/80 p-2.5 rounded-xl border border-slate-800"></p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Hora Entrada</label>
+            <input type="time" id="edit-att-entry" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Hora Salida (19:00)</label>
+            <input type="time" id="edit-att-exit" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Inicio Refrigerio</label>
+            <input type="time" id="edit-att-lunch-start" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Fin Refrigerio</label>
+            <input type="time" id="edit-att-lunch-end" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Estado de Asistencia</label>
+          <select id="edit-att-status" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+            <option value="PRESENT">PUNTUAL</option>
+            <option value="LATE">TARDANZA</option>
+            <option value="JUSTIFIED">JUSTIFICADO</option>
+            <option value="ABSENT">FALTA / INASISTENCIA</option>
+          </select>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" id="btn-cancel-edit-att" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">Cancelar</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL PARA REGISTRAR ASISTENCIA MANUAL -->
+  <div id="modal-manual-attendance" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Registrar Asistencia Manual
+        </h3>
+        <button id="btn-close-manual-att" class="p-1 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-manual-attendance" class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Seleccionar Colaborador *</label>
+          <select id="man-att-emp-id" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+            <option value="">Cargando colaboradores...</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Fecha de Asistencia *</label>
+          <input type="date" id="man-att-date" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Hora Entrada</label>
+            <input type="time" id="man-att-entry" value="07:00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Hora Salida (19:00)</label>
+            <input type="time" id="man-att-exit" value="19:00" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Estado</label>
+          <select id="man-att-status" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+            <option value="PRESENT">PUNTUAL</option>
+            <option value="LATE">TARDANZA</option>
+            <option value="JUSTIFIED">JUSTIFICADO</option>
+          </select>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" id="btn-cancel-man-att" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">Cancelar</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/25">Guardar Asistencia</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Scripts -->
-  <script src="/js/api.js?v=2.3"></script>
-  <script src="/js/auth.js?v=2.3"></script>
-  <script src="/js/reports.js?v=2.3"></script>
+  <script src="/js/api.js?v=2.4"></script>
+  <script src="/js/auth.js?v=2.4"></script>
+  <script src="/js/exceljs.min.js"></script>
+  <script src="/js/reports.js?v=2.4"></script>
   <script>
     lucide.createIcons();
   </script>

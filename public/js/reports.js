@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initReportDates();
   await loadDepartmentsFilter();
   await executeReportQuery();
+  initAttendanceModals();
 
   document.getElementById('btn-query-report')?.addEventListener('click', executeReportQuery);
   document.getElementById('btn-export-excel')?.addEventListener('click', exportToExcel);
@@ -77,50 +78,62 @@ function renderReportTable(data) {
   if (!tbody) return;
 
   if (data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="px-6 py-8 text-center text-slate-500 font-sans">No se encontraron registros de tareo para los filtros seleccionados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="px-6 py-8 text-center text-slate-500 font-sans">No se encontraron registros de tareo para los filtros seleccionados.</td></tr>`;
     return;
   }
 
   const statusTags = {
-    PRESENT: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PUNTUAL</span>',
-    LATE: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">TARDANZA</span>',
-    JUSTIFIED: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">JUSTIFICADO</span>',
-    ABSENT: '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">FALTA</span>'
+    PRESENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PUNTUAL</span>',
+    LATE: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20">TARDANZA</span>',
+    JUSTIFIED: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-400 border border-purple-500/20">JUSTIFICADO</span>',
+    ABSENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20">FALTA</span>'
   };
 
   tbody.innerHTML = data.map(row => {
     const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-    const hoursWorked = (row.total_minutes_worked / 60).toFixed(1);
-    const hoursOvertime = (row.total_minutes_overtime / 60).toFixed(1);
+    const hoursWorked = (Number(row.total_minutes_worked || 0) / 60).toFixed(1);
+    const hoursOvertime = (Number(row.total_minutes_overtime || 0) / 60).toFixed(1);
 
     return `
-      <tr class="hover:bg-slate-900/40 transition text-[11px]">
-        <td class="px-4 py-3 font-semibold text-slate-200">${row.attendance_date}</td>
+      <tr class="hover:bg-slate-900/40 transition text-xs">
+        <td class="px-4 py-3 font-bold text-slate-200">${row.attendance_date}</td>
         <td class="px-4 py-3 font-sans">
-          <p class="font-bold text-white">${row.first_name} ${row.last_name}</p>
+          <p class="font-extrabold text-white text-xs uppercase">${row.first_name} ${row.last_name}</p>
           <p class="text-[10px] text-slate-400 font-mono">${row.employee_code} • DNI ${row.document_number}</p>
         </td>
         <td class="px-4 py-3 font-sans">
-          <p class="font-semibold text-slate-300">${row.department_name || 'General'}</p>
-          <p class="text-[10px] text-slate-400">${row.position_name || '-'}</p>
+          <p class="font-bold text-slate-300 text-xs">${row.department_name || 'General'}</p>
+          <p class="text-[10px] text-cyan-400 font-semibold">${row.position_name || '-'}</p>
         </td>
-        <td class="px-4 py-3 text-center text-cyan-300 font-bold">${formatTime(row.first_entry_time)}</td>
+        <td class="px-4 py-3 text-center text-cyan-300 font-black">${formatTime(row.first_entry_time)}</td>
         <td class="px-4 py-3 text-center text-slate-400">${formatTime(row.lunch_start_time)}</td>
         <td class="px-4 py-3 text-center text-slate-400">${formatTime(row.lunch_end_time)}</td>
-        <td class="px-4 py-3 text-center text-cyan-300 font-bold">${formatTime(row.last_exit_time)}</td>
-        <td class="px-4 py-3 text-center text-emerald-400 font-bold">${hoursWorked} h</td>
-        <td class="px-4 py-3 text-center ${row.total_minutes_late > 0 ? 'text-amber-400 font-bold' : 'text-slate-500'}">
+        <td class="px-4 py-3 text-center text-cyan-300 font-black">${formatTime(row.last_exit_time)}</td>
+        <td class="px-4 py-3 text-center text-emerald-400 font-black">${hoursWorked} h</td>
+        <td class="px-4 py-3 text-center ${row.total_minutes_late > 0 ? 'text-amber-400 font-black' : 'text-slate-500'}">
           ${row.total_minutes_late > 0 ? row.total_minutes_late + ' m' : '0'}
         </td>
-        <td class="px-4 py-3 text-center ${row.total_minutes_overtime > 0 ? 'text-cyan-400 font-bold' : 'text-slate-500'}">
+        <td class="px-4 py-3 text-center ${row.total_minutes_overtime > 0 ? 'text-cyan-400 font-black' : 'text-slate-500'}">
           ${row.total_minutes_overtime > 0 ? hoursOvertime + ' h' : '0'}
         </td>
         <td class="px-4 py-3 text-center font-sans">
           ${statusTags[row.status] || row.status}
         </td>
+        <td class="px-4 py-3 text-center no-print">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="openEditAttendanceModal(${row.id})" title="Modificar Horas / Asistencia" class="p-1.5 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 transition cursor-pointer">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="handleDeleteAttendance(${row.id})" title="Eliminar Marcación" class="p-1.5 rounded-lg bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 transition cursor-pointer">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
+
+  lucide.createIcons();
 }
 
 function calculateTotals(data) {
@@ -863,3 +876,159 @@ async function handleDailyExportPdf() {
     showToast('Error al generar PDF: ' + error.message, 'error');
   }
 }
+
+/**
+ * ============================================================================
+ * GESTIÓN DIRECTA DE ASISTENCIA: EDICIÓN, ELIMINACIÓN Y REGISTRO MANUAL
+ * ============================================================================
+ */
+
+function initAttendanceModals() {
+  const modalEdit = document.getElementById('modal-edit-attendance');
+  const modalManual = document.getElementById('modal-manual-attendance');
+
+  // Botones cerrar y cancelar
+  document.getElementById('btn-close-edit-att')?.addEventListener('click', () => modalEdit?.classList.add('hidden'));
+  document.getElementById('btn-cancel-edit-att')?.addEventListener('click', () => modalEdit?.classList.add('hidden'));
+
+  document.getElementById('btn-close-manual-att')?.addEventListener('click', () => modalManual?.classList.add('hidden'));
+  document.getElementById('btn-cancel-man-att')?.addEventListener('click', () => modalManual?.classList.add('hidden'));
+
+  // Abrir modal de asistencia manual
+  document.getElementById('btn-open-manual-att')?.addEventListener('click', async () => {
+    modalManual?.classList.remove('hidden');
+    const dateInput = document.getElementById('man-att-date');
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    await loadManualEmployeesDropdown();
+  });
+
+  // Guardar edición de asistencia
+  document.getElementById('form-edit-attendance')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-att-id')?.value;
+    const entryTimeVal = document.getElementById('edit-att-entry')?.value;
+    const exitTimeVal = document.getElementById('edit-att-exit')?.value;
+    const lunchStartVal = document.getElementById('edit-att-lunch-start')?.value;
+    const lunchEndVal = document.getElementById('edit-att-lunch-end')?.value;
+    const statusVal = document.getElementById('edit-att-status')?.value;
+
+    const row = reportData.find(r => r.id == id);
+    const dateStr = row ? row.attendance_date : new Date().toISOString().split('T')[0];
+
+    const toIso = (timeStr) => timeStr ? `${dateStr}T${timeStr}:00` : null;
+
+    try {
+      showToast('Guardando modificaciones...', 'info');
+      await api.attendance.updateRecord(id, {
+        first_entry_time: toIso(entryTimeVal),
+        last_exit_time: toIso(exitTimeVal),
+        lunch_start_time: toIso(lunchStartVal),
+        lunch_end_time: toIso(lunchEndVal),
+        status: statusVal
+      });
+
+      showToast('Marcación actualizada exitosamente.', 'success');
+      modalEdit?.classList.add('hidden');
+      await executeReportQuery();
+    } catch (err) {
+      showToast('Error al actualizar: ' + err.message, 'error');
+    }
+  });
+
+  // Guardar registro manual
+  document.getElementById('form-manual-attendance')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const empId = document.getElementById('man-att-emp-id')?.value;
+    const dateVal = document.getElementById('man-att-date')?.value;
+    const entryTimeVal = document.getElementById('man-att-entry')?.value;
+    const exitTimeVal = document.getElementById('man-att-exit')?.value;
+    const statusVal = document.getElementById('man-att-status')?.value;
+
+    if (!empId || !dateVal) {
+      showToast('Selecciona colaborador y fecha.', 'warning');
+      return;
+    }
+
+    const toIso = (timeStr) => timeStr ? `${dateVal}T${timeStr}:00` : null;
+
+    try {
+      showToast('Registrando asistencia manual...', 'info');
+      await api.attendance.createManualRecord({
+        employee_id: empId,
+        attendance_date: dateVal,
+        first_entry_time: toIso(entryTimeVal),
+        last_exit_time: toIso(exitTimeVal),
+        status: statusVal
+      });
+
+      showToast('Asistencia manual registrada con éxito.', 'success');
+      modalManual?.classList.add('hidden');
+      await executeReportQuery();
+    } catch (err) {
+      showToast('Error al crear asistencia: ' + err.message, 'error');
+    }
+  });
+}
+
+/**
+ * Cargar lista de colaboradores en el dropdown del modal manual
+ */
+async function loadManualEmployeesDropdown() {
+  const select = document.getElementById('man-att-emp-id');
+  if (!select) return;
+
+  try {
+    const res = await api.employees.getAll();
+    if (res && res.data) {
+      const activeOnly = res.data.filter(e => e.status === 'ACTIVE');
+      select.innerHTML = '<option value="">-- Seleccionar Colaborador --</option>' +
+        activeOnly.map(e => `<option value="${e.id}">${e.last_name}, ${e.first_name} (DNI: ${e.document_number}) - ${e.position_name || 'Operario'}</option>`).join('');
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+/**
+ * Abrir modal para editar registro de asistencia
+ */
+window.openEditAttendanceModal = function(id) {
+  const row = reportData.find(r => r.id == id);
+  if (!row) return;
+
+  const modal = document.getElementById('modal-edit-attendance');
+  document.getElementById('edit-att-id').value = row.id;
+  document.getElementById('edit-att-emp-name').textContent = `${row.first_name} ${row.last_name} (${row.employee_code} • DNI ${row.document_number})`;
+
+  const getTime = (iso) => iso ? new Date(iso).toTimeString().substring(0, 5) : '';
+
+  document.getElementById('edit-att-entry').value = getTime(row.first_entry_time) || '07:00';
+  document.getElementById('edit-att-exit').value = getTime(row.last_exit_time) || '19:00';
+  document.getElementById('edit-att-lunch-start').value = getTime(row.lunch_start_time) || '12:00';
+  document.getElementById('edit-att-lunch-end').value = getTime(row.lunch_end_time) || '13:00';
+  document.getElementById('edit-att-status').value = row.status || 'PRESENT';
+
+  modal?.classList.remove('hidden');
+};
+
+/**
+ * Eliminar marcación de asistencia
+ */
+window.handleDeleteAttendance = async function(id) {
+  const row = reportData.find(r => r.id == id);
+  const name = row ? `${row.first_name} ${row.last_name}` : 'este colaborador';
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar la marcación de ${name} del día ${row ? row.attendance_date : ''}? Esta acción no se puede deshacer.`)) {
+    return;
+  }
+
+  try {
+    showToast('Eliminando marcación...', 'info');
+    await api.attendance.deleteRecord(id);
+    showToast('Marcación eliminada exitosamente.', 'success');
+    await executeReportQuery();
+  } catch (err) {
+    showToast('Error al eliminar marcación: ' + err.message, 'error');
+  }
+};
+

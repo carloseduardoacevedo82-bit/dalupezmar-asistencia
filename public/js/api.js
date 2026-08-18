@@ -97,6 +97,9 @@ const api = {
       const query = new URLSearchParams(params).toString();
       return api.request(`/attendance/report?${query}`);
     },
+    updateRecord: (id, data) => api.request(`/attendance/records/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteRecord: (id) => api.request(`/attendance/records/${id}`, { method: 'DELETE' }),
+    createManualRecord: (data) => api.request('/attendance/manual-record', { method: 'POST', body: JSON.stringify(data) }),
     getJustifications: (params = {}) => {
       const query = new URLSearchParams(params).toString();
       return api.request(`/attendance/justifications?${query}`);

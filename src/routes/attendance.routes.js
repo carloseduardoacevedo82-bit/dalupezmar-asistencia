@@ -13,6 +13,11 @@ router.get('/today-logs', attendanceController.getTodayLogs);
 // Reporte histórico de asistencia (protegido)
 router.get('/report', verifyToken, attendanceController.getAttendanceReport);
 
+// Administración y modificación de asistencias
+router.put('/records/:id', verifyToken, requireRoles('ADMIN', 'HR'), attendanceController.updateAttendanceRecord);
+router.delete('/records/:id', verifyToken, requireRoles('ADMIN', 'HR'), attendanceController.deleteAttendanceRecord);
+router.post('/manual-record', verifyToken, requireRoles('ADMIN', 'HR'), attendanceController.createManualAttendance);
+
 // Justificaciones
 router.get('/justifications', verifyToken, attendanceController.getJustifications);
 router.post('/justifications', uploadPhoto.single('document'), attendanceController.createJustification);

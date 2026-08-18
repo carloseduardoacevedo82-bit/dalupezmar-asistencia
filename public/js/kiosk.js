@@ -189,9 +189,19 @@ async function initCameraScanner() {
 async function startScanning(cameraId) {
   try {
     const config = {
-      fps: 12,
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.3333
+      fps: 20,
+      qrbox: function(viewfinderWidth, viewfinderHeight) {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const qrboxEdgeSize = Math.floor(minEdge * 0.85);
+        return {
+          width: Math.max(qrboxEdgeSize, 220),
+          height: Math.max(qrboxEdgeSize, 220)
+        };
+      },
+      aspectRatio: 1.3333,
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+      }
     };
 
     await html5QrCode.start(

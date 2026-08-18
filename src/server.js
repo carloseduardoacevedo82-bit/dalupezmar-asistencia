@@ -125,8 +125,29 @@ try {
   for (const dni of bajasDnis) {
     updateBaja.run(dni);
   }
+
+  // 7. Sincronizar turnos a jornada 07:00 - 19:00 (7:00 PM)
+  db.prepare("UPDATE shifts SET entry_time = '07:00:00', exit_time = '19:00:00' WHERE id IN (1, 2, 4) OR name LIKE '%Producc%' OR name LIKE '%Operat%'").run();
+
+  // 8. Sincronizar badges QR para todos los colaboradores
+  const employees = db.prepare('SELECT id, employee_code, document_number FROM employees').all();
+  const insertOrReplaceBadge = db.prepare(`
+    INSERT OR REPLACE INTO badges (
+      id, employee_id, badge_code, qr_token_hash, barcode_value,
+      issue_date, expiration_date, status, template_theme
+    ) VALUES (
+      (SELECT id FROM badges WHERE employee_id = ?),
+      ?, ?, ?, ?, '2026-01-01', '2028-12-31', 'ACTIVE', 'DALUPEZMAR_OFFICIAL'
+    )
+  `);
+
+  for (const emp of employees) {
+    const qrHash = `AGY_SEC_QR_${emp.employee_code}_${emp.document_number}`;
+    insertOrReplaceBadge.run(emp.id, emp.id, `BADGE-${emp.employee_code}`, qrHash, emp.document_number);
+  }
+
   db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
-  console.log('✅ Sincronización oficial DALUPEZMAR: Puestos y bajas aplicados con éxito.');
+  console.log('✅ Sincronización oficial DALUPEZMAR: Puestos, turnos 07:00-19:00 y QR aplicados con éxito.');
 } catch (syncErr) {
   console.log('Nota de sincronización de personal:', syncErr.message);
 }
