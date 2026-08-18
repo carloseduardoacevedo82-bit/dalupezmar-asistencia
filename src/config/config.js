@@ -11,8 +11,8 @@ module.exports = {
   apiIntegrationKey: process.env.API_INTEGRATION_KEY || 'ag_erp_live_key_982347102938471209384',
   dbFile: process.env.DB_FILE || path.join(__dirname, '../../database/asistencia.db'),
   company: {
-    name: process.env.COMPANY_NAME || 'CORPORACIÓN GLOBAL TECH S.A.C.',
-    ruc: process.env.COMPANY_RUC || '20601234567',
-    address: process.env.COMPANY_ADDRESS || 'Av. Empresarial 1234, Centro Financiero'
+    name: process.env.COMPANY_NAME || 'DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.',
+    ruc: process.env.COMPANY_RUC || '20615714128',
+    address: process.env.COMPANY_ADDRESS || 'Planta Industrial PECEPE S.A.C.'
   }
 };
