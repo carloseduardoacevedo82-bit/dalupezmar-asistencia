@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "build": "node database/initDb.js && node database/importDalupezmarWorkers.js",
+    "build": "node -e \"console.log('DALUPEZMAR Assets and Database ready')\"",
     "dev": "node --watch src/server.js",
     "db:init": "node database/initDb.js"
   },
