@@ -392,13 +392,162 @@ window.reactivateEmployee = async function(empId) {
   }
 };
 
+let employeeCameraStream = null;
+let currentCameraFacing = 'user'; // 'user' (frontal) o 'environment' (trasera)
+let capturedPhotoBlob = null;
+let currentPhotoMode = 'file'; // 'file' o 'camera'
+
+/**
+ * Cambiar entre modo Archivo y modo Cámara
+ */
+window.setEmployeePhotoMode = function(mode) {
+  currentPhotoMode = mode;
+  const btnFile = document.getElementById('btn-photo-mode-file');
+  const btnCamera = document.getElementById('btn-photo-mode-camera');
+  const containerFile = document.getElementById('container-photo-file');
+  const containerCamera = document.getElementById('container-photo-camera');
+
+  if (mode === 'camera') {
+    btnCamera.className = 'px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 border transition bg-cyan-600/20 text-cyan-400 border-cyan-500/40 cursor-pointer';
+    btnFile.className = 'px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 border transition bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer';
+    containerCamera.classList.remove('hidden');
+    containerFile.classList.add('hidden');
+  } else {
+    btnFile.className = 'px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 border transition bg-blue-600/20 text-blue-400 border-blue-500/40 cursor-pointer';
+    btnCamera.className = 'px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 border transition bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer';
+    containerFile.classList.remove('hidden');
+    containerCamera.classList.add('hidden');
+    stopEmployeeCamera();
+  }
+  lucide.createIcons();
+};
+
+/**
+ * Previsualizar foto cargada desde Archivo / Galería
+ */
+window.previewEmployeeFilePhoto = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  capturedPhotoBlob = null; // Priorizar archivo
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const previewImg = document.getElementById('emp-photo-preview-img');
+    const statusEl = document.getElementById('emp-photo-status');
+    if (previewImg) previewImg.src = e.target.result;
+    if (statusEl) statusEl.textContent = `Archivo seleccionado: ${file.name}`;
+  };
+  reader.readAsDataURL(file);
+};
+
+/**
+ * Iniciar Cámara en Vivo del Dispositivo
+ */
+window.startEmployeeCamera = async function() {
+  const video = document.getElementById('emp-camera-video');
+  const placeholder = document.getElementById('emp-camera-placeholder');
+  const btnStart = document.getElementById('btn-start-emp-camera');
+  const btnSwitch = document.getElementById('btn-switch-emp-camera');
+  const btnCapture = document.getElementById('btn-capture-emp-camera');
+
+  stopEmployeeCamera();
+
+  try {
+    const constraints = {
+      video: {
+        facingMode: currentCameraFacing,
+        width: { ideal: 640 },
+        height: { ideal: 640 }
+      },
+      audio: false
+    };
+
+    employeeCameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = employeeCameraStream;
+    video.classList.remove('hidden');
+    placeholder.classList.add('hidden');
+
+    btnStart.classList.add('hidden');
+    btnSwitch.classList.remove('hidden');
+    btnCapture.classList.remove('hidden');
+  } catch (err) {
+    showToast('No se pudo acceder a la cámara: ' + err.message, 'error');
+  }
+};
+
+/**
+ * Alternar entre Cámara Frontal y Trasera
+ */
+window.switchEmployeeCameraFacing = async function() {
+  currentCameraFacing = currentCameraFacing === 'user' ? 'environment' : 'user';
+  await startEmployeeCamera();
+};
+
+/**
+ * Capturar Foto desde el Video Stream
+ */
+window.captureEmployeePhoto = function() {
+  const video = document.getElementById('emp-camera-video');
+  if (!video || !employeeCameraStream) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 480;
+  canvas.height = video.videoHeight || 480;
+
+  const ctx = canvas.getContext('2d');
+  // Si es frontal, voltear horizontalmente para efecto espejo natural
+  if (currentCameraFacing === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob((blob) => {
+    capturedPhotoBlob = blob;
+    const previewImg = document.getElementById('emp-photo-preview-img');
+    const statusEl = document.getElementById('emp-photo-status');
+
+    if (previewImg) previewImg.src = URL.createObjectURL(blob);
+    if (statusEl) statusEl.textContent = '📸 Foto capturada con cámara en vivo';
+
+    showToast('¡Foto capturada con éxito!', 'success');
+    stopEmployeeCamera();
+  }, 'image/jpeg', 0.9);
+};
+
+/**
+ * Detener y liberar Cámara del Dispositivo
+ */
+window.stopEmployeeCamera = function() {
+  if (employeeCameraStream) {
+    employeeCameraStream.getTracks().forEach(track => track.stop());
+    employeeCameraStream = null;
+  }
+  const video = document.getElementById('emp-camera-video');
+  const placeholder = document.getElementById('emp-camera-placeholder');
+  const btnStart = document.getElementById('btn-start-emp-camera');
+  const btnSwitch = document.getElementById('btn-switch-emp-camera');
+  const btnCapture = document.getElementById('btn-capture-emp-camera');
+
+  if (video) video.classList.add('hidden');
+  if (placeholder) placeholder.classList.remove('hidden');
+  if (btnStart) btnStart.classList.remove('hidden');
+  if (btnSwitch) btnSwitch.classList.add('hidden');
+  if (btnCapture) btnCapture.classList.add('hidden');
+};
+
 /**
  * Modal de Creación / Edición
  */
 window.openEmployeeModal = function(empId = null) {
   const form = document.getElementById('form-employee');
   const title = document.getElementById('modal-emp-title');
+  const previewImg = document.getElementById('emp-photo-preview-img');
+  const statusEl = document.getElementById('emp-photo-status');
   form.reset();
+  capturedPhotoBlob = null;
+  setEmployeePhotoMode('file');
+  stopEmployeeCamera();
 
   if (empId) {
     const emp = employeesData.find(e => e.id === empId);
@@ -418,17 +567,29 @@ window.openEmployeeModal = function(empId = null) {
     document.getElementById('emp-work-mode').value = emp.work_mode || 'PRESENTIAL';
     document.getElementById('emp-emergency-name').value = emp.emergency_contact_name || '';
     document.getElementById('emp-emergency-phone').value = emp.emergency_contact_phone || '';
+
+    if (previewImg) previewImg.src = emp.photo_url || DEFAULT_AVATAR;
+    if (statusEl) statusEl.textContent = 'Foto actual del colaborador';
   } else {
     title.innerHTML = `<i data-lucide="user-plus" class="w-5 h-5 text-blue-400"></i> Registrar Nuevo Colaborador`;
     document.getElementById('emp-form-id').value = '';
     document.getElementById('emp-doc-type').value = 'DNI';
     document.getElementById('emp-branch').value = '1'; // PECEPE S.A.C.
     document.getElementById('emp-blood-type').value = 'O+';
+
+    if (previewImg) previewImg.src = DEFAULT_AVATAR;
+    if (statusEl) statusEl.textContent = 'Foto predeterminada';
   }
 
   document.getElementById('modal-employee')?.classList.remove('hidden');
   lucide.createIcons();
 };
+
+// Cerrar cámara si se cancela el modal
+document.getElementById('btn-cancel-emp-modal')?.addEventListener('click', () => {
+  stopEmployeeCamera();
+  document.getElementById('modal-employee')?.classList.add('hidden');
+});
 
 async function handleEmployeeFormSubmit(e) {
   e.preventDefault();
@@ -449,12 +610,18 @@ async function handleEmployeeFormSubmit(e) {
   formData.append('emergency_contact_name', document.getElementById('emp-emergency-name').value.trim());
   formData.append('emergency_contact_phone', document.getElementById('emp-emergency-phone').value.trim());
 
-  const photoFile = document.getElementById('emp-photo').files[0];
-  if (photoFile) {
-    formData.append('photo', photoFile);
+  // Adjuntar foto: ya sea capturada por cámara o seleccionada de archivo
+  if (capturedPhotoBlob) {
+    formData.append('photo', capturedPhotoBlob, 'camera-photo.jpg');
+  } else {
+    const photoFile = document.getElementById('emp-photo')?.files[0];
+    if (photoFile) {
+      formData.append('photo', photoFile);
+    }
   }
 
   try {
+    showToast('Guardando datos del colaborador...', 'info');
     let res;
     if (empId) {
       res = await api.employees.update(empId, formData);
@@ -464,8 +631,11 @@ async function handleEmployeeFormSubmit(e) {
 
     if (res && res.success) {
       showToast(empId ? 'Colaborador actualizado exitosamente.' : '¡Colaborador registrado y fotocheck emitido!', 'success');
+      stopEmployeeCamera();
       document.getElementById('modal-employee')?.classList.add('hidden');
       await loadEmployeesList();
+    } else {
+      showToast(res.message || 'Error al guardar colaborador.', 'error');
     }
   } catch (error) {
     showToast(error.message || 'Error al guardar colaborador.', 'error');

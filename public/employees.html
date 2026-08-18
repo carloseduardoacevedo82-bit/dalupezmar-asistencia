@@ -245,10 +245,63 @@
           </div>
         </div>
 
-        <!-- Fila 6: Foto de Perfil -->
-        <div>
-          <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Foto de Perfil para Fotocheck</label>
-          <input type="file" id="emp-photo" accept="image/png,image/jpeg,image/webp" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500">
+        <!-- Fila 6: Selector Dual de Foto (Cámara en Vivo vs Archivo / Galería) -->
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-200 uppercase tracking-wide">
+              Foto de Perfil para Fotocheck
+            </label>
+            <span class="text-[10px] text-cyan-400 font-bold">Escoge una opción</span>
+          </div>
+
+          <!-- Selector de Modo de Foto -->
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btn-photo-mode-file" onclick="setEmployeePhotoMode('file')" class="px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 border transition bg-blue-600/20 text-blue-400 border-blue-500/40 cursor-pointer">
+              <i data-lucide="upload" class="w-4 h-4"></i> Subir Archivo
+            </button>
+            <button type="button" id="btn-photo-mode-camera" onclick="setEmployeePhotoMode('camera')" class="px-3 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 border transition bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer">
+              <i data-lucide="camera" class="w-4 h-4"></i> Tomar con Cámara
+            </button>
+          </div>
+
+          <!-- Opción 1: Subir Archivo -->
+          <div id="container-photo-file" class="space-y-2">
+            <input type="file" id="emp-photo" accept="image/png,image/jpeg,image/webp,image/*" onchange="previewEmployeeFilePhoto(event)" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer">
+            <p class="text-[10px] text-slate-400">Puedes seleccionar una foto desde tu galería o explorador de archivos.</p>
+          </div>
+
+          <!-- Opción 2: Cámara en Vivo con Celular / Tablet -->
+          <div id="container-photo-camera" class="hidden space-y-3">
+            <div class="relative w-full max-w-[220px] mx-auto aspect-square rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-cyan-500/40 shadow-inner flex items-center justify-center">
+              <video id="emp-camera-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
+              <div id="emp-camera-placeholder" class="text-center p-4">
+                <i data-lucide="camera" class="w-8 h-8 text-cyan-400/60 mx-auto mb-1.5"></i>
+                <p class="text-xs text-slate-300 font-bold">Cámara no iniciada</p>
+                <p class="text-[10px] text-slate-500 mt-0.5">Toca "Iniciar Cámara" para capturar la foto</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <button type="button" id="btn-start-emp-camera" onclick="startEmployeeCamera()" class="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md cursor-pointer">
+                <i data-lucide="video" class="w-4 h-4"></i> Iniciar Cámara
+              </button>
+              <button type="button" id="btn-switch-emp-camera" onclick="switchEmployeeCameraFacing()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1 hidden cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Cambiar Cámara
+              </button>
+              <button type="button" id="btn-capture-emp-camera" onclick="captureEmployeePhoto()" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md hidden cursor-pointer">
+                <i data-lucide="camera" class="w-4 h-4"></i> Capturar Foto 📸
+              </button>
+            </div>
+          </div>
+
+          <!-- Previsualización de la Foto Final -->
+          <div id="container-photo-preview" class="pt-2 border-t border-slate-800 flex items-center gap-3">
+            <img id="emp-photo-preview-img" src="/uploads/photos/default-avatar.png" class="w-14 h-14 rounded-2xl object-cover border-2 border-cyan-500/50 shadow-md">
+            <div>
+              <p class="text-xs font-bold text-white" id="emp-photo-status">Foto predeterminada</p>
+              <p class="text-[10px] text-slate-400">Esta foto aparecerá en el fotocheck y reportes.</p>
+            </div>
+          </div>
         </div>
 
         <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
