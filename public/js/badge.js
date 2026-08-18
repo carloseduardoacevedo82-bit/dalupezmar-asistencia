@@ -331,18 +331,21 @@ async function selectEmployee(empId) {
       branchSelect.value = emp.branch_id || 1;
     }
 
-    // Mostrar preview de foto actual
+    // Mostrar preview de foto actual si existe
     const previewThumb = document.getElementById('photo-preview-thumb');
     const thumbImg = document.getElementById('thumb-img');
-    if (emp.photo_url) {
-      thumbImg.src = emp.photo_url;
-      previewThumb.classList.remove('hidden');
-    } else {
-      previewThumb.classList.add('hidden');
+    if (thumbImg) {
+      if (emp.photo_url) {
+        thumbImg.src = emp.photo_url;
+        previewThumb?.classList.remove('hidden');
+      } else {
+        previewThumb?.classList.add('hidden');
+      }
     }
 
     renderBadge(emp);
   } catch (error) {
+    console.error('Error al seleccionar colaborador:', error);
     showToast('Error al cargar datos del fotocheck: ' + error.message, 'error');
   }
 }
@@ -366,9 +369,16 @@ function renderBadge(emp) {
   }
 
   const docType = emp.document_type || (emp.document_number && emp.document_number.length === 9 ? 'CEX' : 'DNI');
-  document.getElementById('badge-doc-number').textContent = `${docType}: ${emp.document_number}`;
-  document.getElementById('badge-emp-code').textContent = emp.employee_code || `DAL-${emp.id}`;
-  document.getElementById('badge-photo').src = emp.photo_url || '/uploads/photos/default-avatar.png';
+  const docNumEl = document.getElementById('badge-doc-number');
+  if (docNumEl) docNumEl.textContent = `${docType}: ${emp.document_number}`;
+
+  const empCodeEl = document.getElementById('badge-emp-code');
+  if (empCodeEl) empCodeEl.textContent = emp.employee_code || `DAL-${emp.id}`;
+
+  const badgePhoto = document.getElementById('badge-photo');
+  if (badgePhoto) {
+    badgePhoto.src = emp.photo_url || '/uploads/photos/default-avatar.png';
+  }
 
   // Banner inferior según cargo dinámico (NARANJA para AREA EXTERIOR, VERDE para Troquelado de Anillas)
   const posName = (emp.position_name || 'OPERARIO DE PRODUCCIÓN').toUpperCase();
