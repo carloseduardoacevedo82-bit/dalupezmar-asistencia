@@ -55,10 +55,10 @@
     <!-- Formulario de Inicio de Sesión -->
     <form id="login-form" class="space-y-4">
       <div>
-        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Usuario</label>
+        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Usuario / Correo</label>
         <div class="relative">
           <i data-lucide="user" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
-          <input type="text" id="login-username" value="admin" required placeholder="admin" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+          <input type="text" id="login-username" required placeholder="Ingresa tu usuario" autocomplete="username" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
         </div>
       </div>
 
@@ -66,32 +66,28 @@
         <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Contraseña</label>
         <div class="relative">
           <i data-lucide="lock" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
-          <input type="password" id="login-password" value="admin123" required placeholder="••••••••" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+          <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition">
         </div>
       </div>
 
-      <button type="submit" id="btn-login-submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 transition transform active:scale-95">
-        <i data-lucide="log-in" class="w-4 h-4"></i> Ingresar al Entorno Único
+      <button type="submit" id="btn-login-submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black text-sm shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 transition transform active:scale-95 cursor-pointer">
+        <i data-lucide="log-in" class="w-4 h-4"></i> Iniciar Sesión
       </button>
     </form>
 
-    <!-- Acceso Directo al Entorno Completo -->
-    <div class="pt-3 border-t border-slate-800/80">
-      <a href="/app.html" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-300 text-xs font-black flex items-center justify-center gap-2 transition shadow-inner">
-        <i data-lucide="monitor" class="w-4 h-4"></i> Abrir Entorno Directo (PC / Móvil)
+    <!-- Enlace al Portal del Trabajador -->
+    <div class="pt-3 border-t border-slate-800/80 text-center">
+      <a href="/portal-trabajador.html" class="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-bold transition">
+        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+        <span>¿Eres colaborador? Marca asistencia aquí</span>
       </a>
-    </div>
-
-    <!-- Credenciales Oficiales -->
-    <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 text-center">
-      Acceso Administrativo: Usuario: <b class="text-blue-400 font-mono">admin</b> | Clave: <b class="text-blue-400 font-mono">admin123</b>
     </div>
 
   </div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=3.0"></script>
-  <script src="/js/auth.js?v=3.0"></script>
+  <script src="/js/api.js?v=3.9"></script>
+  <script src="/js/auth.js?v=3.9"></script>
   <script>
     lucide.createIcons();
 
