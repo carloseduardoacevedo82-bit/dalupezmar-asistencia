@@ -166,7 +166,23 @@ const punch = (req, res) => {
       }
     }
 
-    // 5. Insertar log individual de marcación con GPS
+    // 5. Procesar foto selfie de verificación si fue enviada
+    let selfieUrl = null;
+    if (req.body.photo_selfie && req.body.photo_selfie.startsWith('data:image')) {
+      try {
+        const base64Data = req.body.photo_selfie.replace(/^data:image\/\w+;base64,/, '');
+        const filename = `selfie-${Date.now()}-${emp.employee_id}.jpg`;
+        const fs = require('fs');
+        const path = require('path');
+        const savePath = path.join(__dirname, '../../public/uploads/photos', filename);
+        fs.writeFileSync(savePath, Buffer.from(base64Data, 'base64'));
+        selfieUrl = `/uploads/photos/${filename}`;
+      } catch (err) {
+        console.warn('Error al guardar foto selfie:', err.message);
+      }
+    }
+
+    // 6. Insertar log individual de marcación con GPS
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
     const insertLog = db.prepare(`
       INSERT INTO attendance_logs (
@@ -184,12 +200,12 @@ const punch = (req, res) => {
       latitude || null,
       longitude || null,
       isWithinGeofence,
-      device_info || null,
+      selfieUrl ? `${device_info || 'Móvil'} | Selfie: ${selfieUrl}` : (device_info || null),
       ip,
       raw
     );
 
-    // 6. Actualizar la jornada diaria y calcular tardanzas / horas trabajadas hasta las 19:00
+    // 7. Actualizar la jornada diaria y calcular tardanzas / horas trabajadas hasta las 19:00
     let updatedStatus = attendance.status;
     let tardinessMinutes = attendance.total_minutes_late || 0;
     let workedMinutes = attendance.total_minutes_worked || 0;
@@ -247,17 +263,23 @@ const punch = (req, res) => {
       attendance.id
     );
 
-    // Formatear mensaje descriptivo
-    const typeNames = {
+    // 8. Mensaje personalizado de respuesta
+    const punchNames = {
       ENTRY: 'Entrada Registrada',
       LUNCH_START: 'Inicio de Refrigerio',
       LUNCH_END: 'Fin de Refrigerio',
       EXIT: 'Salida Registrada'
     };
 
-    let msg = `¡${typeNames[resolvedType] || resolvedType} confirmada!`;
+    let msg = `¡${punchNames[resolvedType] || 'Marcación'} confirmada!`;
     if (resolvedType === 'ENTRY' && tardinessMinutes > 0) {
       msg += ` (Tardanza: ${tardinessMinutes} min)`;
+    } else if (resolvedType === 'ENTRY') {
+      msg += ' (Puntual)';
+    }
+
+    if (isWithinGeofence === 0 && distanceToBranch) {
+      msg += ` ⚠️ Fuera de sede asignada (${distanceToBranch}m de distancia).`;
     }
 
     return successResponse(res, msg, {
@@ -268,7 +290,8 @@ const punch = (req, res) => {
         department: emp.department_name,
         position: emp.position_name,
         photo_url: emp.photo_url,
-        work_mode: emp.work_mode
+        work_mode: emp.work_mode,
+        branch_name: emp.branch_name || 'Planta Principal'
       },
       punch: {
         type: resolvedType,
@@ -277,8 +300,9 @@ const punch = (req, res) => {
         tardiness_minutes: tardinessMinutes,
         is_within_geofence: isWithinGeofence === 1,
         distance_meters: distanceToBranch,
-        latitude: latitude || null,
-        longitude: longitude || null
+        latitude,
+        longitude,
+        selfie_url: selfieUrl
       }
     });
   } catch (error) {

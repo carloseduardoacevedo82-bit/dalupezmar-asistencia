@@ -81,7 +81,10 @@ const api = {
     getById: (id) => api.request(`/employees/${id}`),
     create: (formData) => api.request('/employees', { method: 'POST', body: formData }),
     update: (id, formData) => api.request(`/employees/${id}`, { method: 'PUT', body: formData }),
-    getCatalogs: () => api.request('/employees/catalogs')
+    getCatalogs: () => api.request('/employees/catalogs'),
+    getBranches: () => api.request('/employees/branches'),
+    updateBranchGeofence: (id, data) => api.request(`/employees/branches/${id}/geofence`, { method: 'PUT', body: JSON.stringify(data) }),
+    assignBranch: (employeeId, branchId) => api.request(`/employees/${employeeId}/branch`, { method: 'PUT', body: JSON.stringify({ branch_id: branchId }) })
   },
 
   badges: {

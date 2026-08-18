@@ -321,10 +321,81 @@ const getCatalogs = (req, res) => {
   }
 };
 
+/**
+ * Obtener listado de Sedes y Geocercas GPS
+ */
+const getBranches = (req, res) => {
+  try {
+    const branches = db.prepare("SELECT * FROM branches ORDER BY id ASC").all();
+    return successResponse(res, 'Sedes obtenidas.', branches);
+  } catch (error) {
+    return errorResponse(res, 'Error al obtener sedes.', error.message);
+  }
+};
+
+/**
+ * Actualizar Geocerca GPS y datos de una Sede de Marcación
+ */
+const updateBranchGeofence = (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, address, latitude, longitude, radius_meters } = req.body;
+
+    const existing = db.prepare('SELECT * FROM branches WHERE id = ?').get(id);
+    if (!existing) {
+      return errorResponse(res, 'Sede no encontrada.', null, 404);
+    }
+
+    db.prepare(`
+      UPDATE branches SET
+        name = ?,
+        address = ?,
+        latitude = ?,
+        longitude = ?,
+        radius_meters = ?
+      WHERE id = ?
+    `).run(
+      name || existing.name,
+      address || existing.address,
+      latitude !== undefined ? latitude : existing.latitude,
+      longitude !== undefined ? longitude : existing.longitude,
+      radius_meters !== undefined ? Number(radius_meters) : existing.radius_meters,
+      id
+    );
+
+    return successResponse(res, 'Sede y Geocerca GPS actualizadas exitosamente.');
+  } catch (error) {
+    return errorResponse(res, 'Error al actualizar sede.', error.message);
+  }
+};
+
+/**
+ * Asignar sitio / sede de marcación autorizada a un trabajador
+ */
+const assignEmployeeBranch = (req, res) => {
+  try {
+    const { id } = req.params;
+    const { branch_id } = req.body;
+
+    if (!branch_id) {
+      return errorResponse(res, 'ID de sede requerido.', null, 400);
+    }
+
+    db.prepare('UPDATE employees SET branch_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(Number(branch_id), id);
+
+    return successResponse(res, 'Sitio de marcación asignado al colaborador con éxito.');
+  } catch (error) {
+    return errorResponse(res, 'Error al asignar sede.', error.message);
+  }
+};
+
 module.exports = {
   getEmployees,
   getEmployeeById,
   createEmployee,
   updateEmployee,
-  getCatalogs
+  getCatalogs,
+  getBranches,
+  updateBranchGeofence,
+  assignEmployeeBranch
 };

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Portal del Trabajador | Marcación con Foto Selfie & GPS | DALUPEZMAR</title>
+  
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#002855">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- HTML5 QR Code Scanner -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=3.2">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-3 sm:p-5">
+
+  <main class="max-w-lg mx-auto w-full space-y-4 my-auto py-2">
+
+    <!-- CABECERA DEL PORTAL DEL TRABAJADOR -->
+    <div class="glass-panel p-4 rounded-3xl border border-slate-800 flex items-center justify-between shadow-xl">
+      <div class="flex items-center gap-3">
+        <img src="/icons/icon-192.png" alt="DALUPEZMAR" class="w-11 h-11 rounded-2xl shadow-lg border border-cyan-400/40 object-cover">
+        <div>
+          <h1 class="text-base font-black text-white leading-tight">PORTAL DEL TRABAJADOR</h1>
+          <p class="text-[11px] text-cyan-400 font-bold">Auto-Marcación con Selfie & GPS</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn-theme-toggle p-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-300">
+          <i data-lucide="sun" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- TARJETA GPS Y SEDE ASIGNADA -->
+    <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-md">
+      <div class="flex items-center gap-3">
+        <div id="selfie-gps-indicator" class="w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse"></div>
+        <div>
+          <p id="selfie-gps-title" class="text-xs font-black text-white">Verificando GPS Satelital...</p>
+          <p id="selfie-gps-coords" class="text-[10px] text-slate-400 font-mono">Obteniendo ubicación precisa...</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a id="selfie-map-link" href="#" target="_blank" class="p-2 rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 text-xs hidden" title="Ver en Google Maps">
+          <i data-lucide="map" class="w-4 h-4"></i>
+        </a>
+        <button onclick="requestSelfieGps()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition" title="Actualizar GPS">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- PANEL PRINCIPAL DE MARCACIÓN CON SELFIE -->
+    <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-4">
+      
+      <!-- Reloj Digital -->
+      <div class="text-center space-y-0.5">
+        <div id="worker-clock" class="text-3xl font-black font-mono text-cyan-300 drop-shadow-md">--:--:--</div>
+        <p id="worker-date" class="text-xs text-slate-400 font-bold uppercase">Cargando fecha...</p>
+      </div>
+
+      <!-- PASO 1: IDENTIFICACIÓN DEL TRABAJADOR -->
+      <div class="space-y-1.5">
+        <label class="block text-xs font-extrabold text-slate-300 uppercase tracking-wider">1. Número de DNI / CEX o Código</label>
+        <div class="relative">
+          <i data-lucide="user-check" class="w-4 h-4 absolute left-3.5 top-3.5 text-cyan-400"></i>
+          <input type="text" id="worker-doc-input" placeholder="Ingresa tu DNI (Ej: 77699820)" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono font-black placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+        </div>
+      </div>
+
+      <!-- PASO 2: CÁMARA FRONTAL PARA FOTO SELFIE DE VERIFICACIÓN -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-extrabold text-slate-300 uppercase tracking-wider">2. Foto Selfie de Validación *</label>
+          <button type="button" onclick="startSelfieCamera()" id="btn-selfie-cam" class="px-2.5 py-1 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1">
+            <i data-lucide="camera" class="w-3.5 h-3.5"></i> <span id="selfie-cam-text">Activar Cámara</span>
+          </button>
+        </div>
+
+        <!-- Visor de Video / Foto Capturada -->
+        <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+          <video id="selfie-video" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
+          <canvas id="selfie-canvas" class="hidden"></canvas>
+          <img id="selfie-preview" class="w-full h-full object-cover hidden" alt="Selfie">
+
+          <div id="selfie-placeholder" class="text-center p-4 space-y-1">
+            <i data-lucide="camera" class="w-10 h-10 text-slate-600 mx-auto"></i>
+            <p class="text-xs text-slate-400 font-semibold">Toca "Activar Cámara" para tomar tu foto de asistencia</p>
+          </div>
+
+          <!-- Botón flotante para capturar snapshot -->
+          <button type="button" id="btn-take-snapshot" onclick="takeSnapshot()" class="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-xs shadow-xl flex items-center gap-2 hidden cursor-pointer">
+            <i data-lucide="aperture" class="w-4 h-4"></i> Capturar Foto
+          </button>
+        </div>
+      </div>
+
+      <!-- PASO 3: BOTONES DE MARCACIÓN -->
+      <div class="space-y-2 pt-1">
+        <label class="block text-xs font-extrabold text-slate-300 uppercase tracking-wider">3. Selecciona Tipo de Marcación</label>
+        
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="submitWorkerSelfiePunch('ENTRY')" class="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer">
+            <i data-lucide="log-in" class="w-4 h-4"></i> ENTRADA
+          </button>
+          <button type="button" onclick="submitWorkerSelfiePunch('EXIT')" class="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-500 text-white font-black text-xs shadow-lg shadow-rose-500/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer">
+            <i data-lucide="log-out" class="w-4 h-4"></i> SALIDA
+          </button>
+          <button type="button" onclick="submitWorkerSelfiePunch('LUNCH_START')" class="py-2.5 px-3 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer">
+            <i data-lucide="utensils" class="w-3.5 h-3.5 text-amber-400"></i> Inicio Ref.
+          </button>
+          <button type="button" onclick="submitWorkerSelfiePunch('LUNCH_END')" class="py-2.5 px-3 rounded-xl bg-slate-900 border border-slate-700 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer">
+            <i data-lucide="coffee" class="w-3.5 h-3.5 text-cyan-400"></i> Fin Ref.
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TARJETA DE CONFIRMACIÓN -->
+    <div id="worker-result-box" class="glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 hidden space-y-3 shadow-2xl">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
+          <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 id="worker-res-title" class="text-sm font-black text-white">¡Asistencia Verificada!</h4>
+          <p id="worker-res-name" class="text-xs text-emerald-300 font-bold">Nombre del Colaborador</p>
+          <p id="worker-res-branch" class="text-[10px] text-cyan-300 font-mono">Sede Asignada</p>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 font-mono text-xs">
+        <p id="worker-res-msg" class="text-slate-200 font-bold"></p>
+        <p id="worker-res-geo" class="text-[11px] text-slate-400"></p>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="max-w-lg mx-auto w-full text-center text-[10px] text-slate-500 py-2">
+    DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C. • Control Georreferenciado
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=3.2"></script>
+  <script src="/js/auth.js?v=3.2"></script>
+  <script>
+    lucide.createIcons();
+
+    let workerCoords = null;
+    let cameraStream = null;
+    let capturedSelfieBase64 = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      startWorkerClock();
+      requestSelfieGps();
+    });
+
+    function startWorkerClock() {
+      const clockEl = document.getElementById('worker-clock');
+      const dateEl = document.getElementById('worker-date');
+
+      function update() {
+        const now = new Date();
+        if (clockEl) clockEl.textContent = now.toLocaleTimeString('es-PE', { hour12: false });
+        if (dateEl) {
+          dateEl.textContent = now.toLocaleDateString('es-PE', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+      }
+      update();
+      setInterval(update, 1000);
+    }
+
+    function requestSelfieGps() {
+      const indicator = document.getElementById('selfie-gps-indicator');
+      const title = document.getElementById('selfie-gps-title');
+      const coordsEl = document.getElementById('selfie-gps-coords');
+      const mapLink = document.getElementById('selfie-map-link');
+
+      if (!navigator.geolocation) {
+        if (title) title.textContent = 'GPS no soportado';
+        if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-rose-500';
+        return;
+      }
+
+      if (title) title.textContent = 'Obteniendo GPS Satelital...';
+      if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          workerCoords = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          };
+
+          if (title) title.textContent = 'GPS Activo y Verificado';
+          if (coordsEl) coordsEl.textContent = `Lat: ${workerCoords.lat.toFixed(5)}, Lng: ${workerCoords.lng.toFixed(5)} (±${Math.round(workerCoords.accuracy)}m)`;
+          if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-md shadow-emerald-500/50';
+
+          if (mapLink) {
+            mapLink.href = `https://www.google.com/maps?q=${workerCoords.lat},${workerCoords.lng}`;
+            mapLink.classList.remove('hidden');
+          }
+        },
+        (err) => {
+          console.warn('GPS error:', err);
+          if (title) title.textContent = 'GPS Desactivado o Sin Permisos';
+          if (coordsEl) coordsEl.textContent = 'Activa la ubicación en tu teléfono';
+          if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-rose-500';
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+
+    async function startSelfieCamera() {
+      const video = document.getElementById('selfie-video');
+      const preview = document.getElementById('selfie-preview');
+      const placeholder = document.getElementById('selfie-placeholder');
+      const btnSnap = document.getElementById('btn-take-snapshot');
+      const btnText = document.getElementById('selfie-cam-text');
+
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+        video.classList.add('hidden');
+        btnSnap.classList.add('hidden');
+        btnText.textContent = 'Activar Cámara';
+        return;
+      }
+
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+
+        video.srcObject = cameraStream;
+        video.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        preview.classList.add('hidden');
+        btnSnap.classList.remove('hidden');
+        btnText.textContent = 'Apagar Cámara';
+      } catch (err) {
+        alert('Error al acceder a la cámara frontal: ' + err.message);
+      }
+    }
+
+    function takeSnapshot() {
+      const video = document.getElementById('selfie-video');
+      const canvas = document.getElementById('selfie-canvas');
+      const preview = document.getElementById('selfie-preview');
+      const btnSnap = document.getElementById('btn-take-snapshot');
+
+      if (!video || !canvas) return;
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      capturedSelfieBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+      preview.src = capturedSelfieBase64;
+      preview.classList.remove('hidden');
+      video.classList.add('hidden');
+      btnSnap.classList.add('hidden');
+
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+
+      document.getElementById('selfie-cam-text').textContent = 'Repetir Foto';
+      showToast('¡Foto Selfie capturada correctamente!', 'success');
+    }
+
+    async function submitWorkerSelfiePunch(punchType) {
+      const docInput = document.getElementById('worker-doc-input');
+      const docNumber = docInput?.value?.trim();
+
+      if (!docNumber) {
+        alert('Por favor, ingresa tu número de DNI o código de trabajador.');
+        docInput?.focus();
+        return;
+      }
+
+      // Si no tomó foto manual, capturar automáticamente si el video está activo
+      if (!capturedSelfieBase64 && cameraStream) {
+        takeSnapshot();
+      }
+
+      const resultBox = document.getElementById('worker-result-box');
+
+      try {
+        showToast('Enviando marcación con verificación...', 'info');
+
+        const payload = {
+          token: docNumber,
+          punch_type: punchType,
+          punch_source: 'REMOTE_WEB',
+          latitude: workerCoords ? workerCoords.lat : null,
+          longitude: workerCoords ? workerCoords.lng : null,
+          photo_selfie: capturedSelfieBase64 || null,
+          device_info: `Portal del Trabajador (${navigator.platform})`
+        };
+
+        const response = await api.attendance.punch(payload);
+
+        if (response && response.success) {
+          if (resultBox) {
+            document.getElementById('worker-res-title').textContent = '¡Marcación Registrada!';
+            document.getElementById('worker-res-name').textContent = `${response.data.employee.name} (${response.data.employee.position})`;
+            document.getElementById('worker-res-branch').textContent = `🏢 Sitio Asignado: ${response.data.employee.branch_name}`;
+            
+            let timeStr = new Date(response.data.punch.time).toLocaleTimeString('es-PE');
+            document.getElementById('worker-res-msg').textContent = `${response.message} • Hora: ${timeStr}`;
+
+            let geoStr = workerCoords ? `🛰️ Coordenadas: ${workerCoords.lat.toFixed(4)}, ${workerCoords.lng.toFixed(4)}` : '⚠️ Sin coordenadas GPS';
+            if (response.data.punch.distance_meters !== null) {
+              geoStr += ` • Distancia a sede: ${response.data.punch.distance_meters}m`;
+            }
+            document.getElementById('worker-res-geo').textContent = geoStr;
+
+            resultBox.classList.remove('hidden');
+            resultBox.scrollIntoView({ behavior: 'smooth' });
+          }
+
+          showToast('¡Asistencia registrada exitosamente!', 'success');
+        } else {
+          alert(response.message || 'Error al procesar la marcación.');
+        }
+      } catch (error) {
+        alert(error.message || 'Error: Colaborador no encontrado.');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -19,10 +19,10 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.1">
+  <link rel="stylesheet" href="/css/styles.css?v=3.3">
 
   <style>
-    /* Visor de alta resolución sin barras dobles ni cortes */
+    /* Estructura del marco unificado con sidebar lateral colapsable */
     .app-frame {
       width: 100%;
       height: calc(100dvh - 56px);
@@ -35,12 +35,36 @@
         height: calc(100dvh - 114px);
       }
     }
+
+    /* Sidebar lateral transitions */
+    #app-sidebar {
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
     
-    /* Efectos de botón de navegación activo */
-    .nav-tab.active-tab {
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    .sidebar-collapsed {
+      width: 0px !important;
+      transform: translateX(-100%) !important;
+      overflow: hidden;
+      border: none !important;
+    }
+    
+    @media (min-width: 769px) {
+      .sidebar-collapsed {
+        width: 72px !important;
+        transform: translateX(0) !important;
+      }
+      .sidebar-collapsed .sidebar-label,
+      .sidebar-collapsed .sidebar-badge,
+      .sidebar-collapsed .sidebar-header-text {
+        display: none !important;
+      }
+    }
+
+    /* Pestaña activa en sidebar */
+    .sidebar-tab.active-tab {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
       color: #ffffff !important;
-      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35);
       border-color: rgba(56, 189, 248, 0.4);
     }
 
@@ -64,77 +88,172 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-hidden select-none">
 
-  <!-- CABECERA SUPERIOR COMPACTA Y ULTRA-NÍTIDA (56px) -->
-  <header class="h-14 md:h-16 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 px-3 md:px-6 flex items-center justify-between z-40 relative shadow-md">
+  <!-- CABECERA SUPERIOR UNIVERSAL (56px) -->
+  <header class="h-14 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 px-3 md:px-5 flex items-center justify-between z-40 relative shadow-md">
     
-    <!-- LOGO Y TÍTULO DALUPEZMAR (ALTO CONTRASTE BLANCO) -->
-    <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchTab('dashboard')">
-      <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-9 h-9 md:w-10 md:h-10 rounded-xl shadow-md border border-cyan-400/40 object-cover">
-      <div class="flex flex-col">
-        <div class="flex items-center gap-1.5">
-          <span class="text-sm md:text-base font-black tracking-tight text-white leading-none">DALUPEZMAR</span>
-          <span class="px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black bg-blue-500/20 text-cyan-300 border border-cyan-500/30">OFICIAL</span>
+    <!-- LADO IZQUIERDO: BOTÓN HAMBURGUESA SIDEBAR + LOGO DALUPEZMAR -->
+    <div class="flex items-center gap-2.5">
+      <!-- Botón Ver / Ocultar Menú Lateral -->
+      <button onclick="toggleSidebar()" id="btn-toggle-sidebar" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 shadow-sm transition flex items-center justify-center cursor-pointer" title="Ver / Ocultar Menú Lateral (☰)">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
+      <!-- Logo Oficial y Nombre DALUPEZMAR -->
+      <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchTab('dashboard')">
+        <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-9 h-9 rounded-xl shadow-md border border-cyan-400/40 object-cover">
+        <div class="flex flex-col">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm md:text-base font-black tracking-tight text-white leading-none">DALUPEZMAR</span>
+            <span class="px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black bg-blue-500/20 text-cyan-300 border border-cyan-500/30">OFICIAL</span>
+          </div>
+          <span id="current-view-title" class="text-[10px] text-slate-400 font-semibold hidden sm:inline leading-tight mt-0.5">Panel de Control</span>
         </div>
-        <span class="text-[10px] text-slate-400 font-semibold hidden sm:inline leading-tight mt-0.5">Control de Asistencia & Fotochecks</span>
       </div>
     </div>
 
-    <!-- PESTAÑAS DE NAVEGACIÓN EN ESCRITORIO Y TABLETS -->
-    <nav class="hidden md:flex items-center gap-1 bg-slate-950/70 p-1 rounded-2xl border border-slate-800/80">
-      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-tab active-tab px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5">
-        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Panel
-      </button>
-
-      <button onclick="switchTab('employees')" id="nav-employees" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-300 hover:text-white transition flex items-center gap-1.5">
-        <i data-lucide="users" class="w-3.5 h-3.5"></i> Personal (87)
-      </button>
-
-      <button onclick="switchTab('badges')" id="nav-badges" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-300 hover:text-white transition flex items-center gap-1.5">
-        <i data-lucide="id-card" class="w-3.5 h-3.5"></i> Fotochecks
-      </button>
-
-      <button onclick="switchTab('reports')" id="nav-reports" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-300 hover:text-white transition flex items-center gap-1.5">
-        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Tareo & Planillas
-      </button>
-
-      <button onclick="switchTab('kiosk')" id="nav-kiosk" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-300 hover:text-white transition flex items-center gap-1.5">
-        <i data-lucide="scan" class="w-3.5 h-3.5 text-cyan-400"></i> Kiosco QR
-      </button>
-
-      <button onclick="switchTab('remote')" id="nav-remote" class="nav-tab px-3.5 py-1.5 rounded-xl text-xs font-extrabold text-slate-300 hover:text-white transition flex items-center gap-1.5">
-        <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-400"></i> GPS & Campo
-      </button>
-    </nav>
-
-    <!-- ACCIONES DE CABECERA: INSTALAR, TEMA Y CERRAR SESIÓN -->
+    <!-- LADO DERECHO: SELECTOR DE ROL, INSTALAR, TEMA Y CERRAR SESIÓN -->
     <div class="flex items-center gap-1.5 md:gap-2">
       
+      <!-- SELECTOR RÁPIDO DE MODO (ADMIN / SUPERVISOR / TRABAJADOR) -->
+      <div class="relative">
+        <select id="select-active-role" onchange="handleRoleSwitch(this.value)" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 font-extrabold text-[11px] md:text-xs py-1.5 px-2.5 rounded-xl border border-cyan-500/30 focus:outline-none cursor-pointer">
+          <option value="ADMIN">👑 Administrador</option>
+          <option value="SUPERVISOR">🛡️ Supervisor Campo</option>
+          <option value="WORKER">👷 Portal Trabajador</option>
+        </select>
+      </div>
+
       <!-- BOTÓN INSTALAR APP PWA -->
-      <button id="btn-install-pwa" onclick="triggerPwaInstall()" class="px-2.5 md:px-3.5 py-1.5 md:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] md:text-xs shadow-md flex items-center gap-1.5 transition active:scale-95">
+      <button id="btn-install-pwa" onclick="triggerPwaInstall()" class="px-2.5 md:px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] md:text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
         <i data-lucide="download" class="w-3.5 h-3.5 stroke-[2.5]"></i>
-        <span class="hidden xs:inline">Instalar App</span>
+        <span class="hidden sm:inline">Instalar</span>
       </button>
 
-      <!-- Botón Tema -->
-      <button onclick="toggleUnifiedTheme()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 transition" title="Cambiar Modo Claro / Oscuro">
+      <!-- Botón Modo Claro / Oscuro -->
+      <button onclick="toggleUnifiedTheme()" class="btn-theme-toggle p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/50 transition cursor-pointer" title="Cambiar Modo Claro / Oscuro">
         <i data-lucide="sun" class="w-4 h-4"></i>
       </button>
 
-      <!-- Botón Salir -->
-      <button onclick="handleLogout()" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 transition" title="Cerrar Sesión">
+      <!-- Botón Cerrar Sesión -->
+      <button onclick="handleLogout()" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700/50 transition cursor-pointer" title="Cerrar Sesión">
         <i data-lucide="log-out" class="w-4 h-4"></i>
       </button>
 
     </div>
   </header>
 
-  <!-- VISOR UNIFICADO PRINCIPAL (SIN SCROLL DOBLE) -->
-  <main class="flex-1 w-full relative bg-slate-950 overflow-hidden">
-    <iframe id="main-app-frame" src="/dashboard.html" class="app-frame w-full" title="Módulo DALUPEZMAR"></iframe>
-  </main>
+  <!-- CONTENEDOR PRINCIPAL: SIDEBAR LATERAL + VISOR -->
+  <div class="flex-1 flex overflow-hidden relative">
 
-  <!-- BARRA DE NAVEGACIÓN INFERIOR NATIVA PARA CELULARES (58px) -->
-  <nav class="md:hidden h-[58px] bg-slate-900/98 backdrop-blur-2xl border-t border-slate-800 grid grid-cols-6 items-center px-1 z-40 safe-bottom shadow-2xl">
+    <!-- TELÓN DE FONDO PARA MÓVILES (BACKDROP SIDEBAR) -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar(false)" class="fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-sm hidden md:hidden"></div>
+
+    <!-- SIDEBAR LATERAL DESPLEGABLE / COLAPSABLE (PC, TABLETS Y CELULARES) -->
+    <aside id="app-sidebar" class="fixed md:static inset-y-0 left-0 z-30 w-64 bg-slate-900/98 backdrop-blur-2xl border-r border-slate-800 p-3.5 flex flex-col justify-between overflow-y-auto shrink-0 shadow-2xl md:shadow-none">
+      
+      <!-- PARTE SUPERIOR DEL SIDEBAR -->
+      <div class="space-y-4">
+        
+        <!-- Cabecera del Sidebar con botón de cerrar en móviles -->
+        <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-800/80">
+          <div class="flex items-center gap-2">
+            <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
+            <span class="text-xs font-black uppercase text-slate-300 tracking-wider sidebar-header-text">Navegación</span>
+          </div>
+          <button onclick="toggleSidebar(false)" class="md:hidden p-1 text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- LISTA DE MENÚS DEL SISTEMA -->
+        <nav class="space-y-1.5" id="sidebar-nav-links">
+          
+          <!-- 1. Panel de Control -->
+          <button onclick="switchTab('dashboard')" id="side-dashboard" class="sidebar-tab active-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-3 transition cursor-pointer">
+            <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
+            <span class="sidebar-label">Panel General</span>
+          </button>
+
+          <!-- 2. Personal (87) -->
+          <button onclick="switchTab('employees')" id="side-employees" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
+            <div class="flex items-center gap-3">
+              <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+              <span class="sidebar-label">Personal</span>
+            </div>
+            <span class="sidebar-badge px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-500/20 text-cyan-300">87</span>
+          </button>
+
+          <!-- 3. Diseñador de Fotochecks -->
+          <button onclick="switchTab('badges')" id="side-badges" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+            <i data-lucide="id-card" class="w-4 h-4 shrink-0"></i>
+            <span class="sidebar-label">Diseñador Fotochecks</span>
+          </button>
+
+          <!-- 4. Tareo, Modificación & Planillas -->
+          <button onclick="switchTab('reports')" id="side-reports" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
+            <div class="flex items-center gap-3">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 shrink-0"></i>
+              <span class="sidebar-label">Tareo & Planillas</span>
+            </div>
+            <span class="sidebar-badge px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-500/20 text-emerald-300">EXCEL</span>
+          </button>
+
+          <!-- 5. Sedes & Geocercas GPS -->
+          <button onclick="switchTab('branches')" id="side-branches" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+            <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-cyan-400"></i>
+            <span class="sidebar-label">Sedes & Geocercas GPS</span>
+          </button>
+
+          <!-- Separador -->
+          <div class="pt-2 pb-1">
+            <p class="text-[9px] font-black uppercase text-slate-500 px-3 sidebar-header-text">Marcaciones y Campo</p>
+          </div>
+
+          <!-- 6. Kiosco Escáner QR -->
+          <button onclick="switchTab('kiosk')" id="side-kiosk" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+            <i data-lucide="scan" class="w-4 h-4 shrink-0 text-cyan-400"></i>
+            <span class="sidebar-label">Kiosco Escáner QR</span>
+          </button>
+
+          <!-- 7. Supervisión Móvil de Campo -->
+          <button onclick="switchTab('remote')" id="side-remote" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+            <i data-lucide="shield-check" class="w-4 h-4 shrink-0 text-emerald-400"></i>
+            <span class="sidebar-label">Supervisor de Campo</span>
+          </button>
+
+          <!-- 8. Portal del Trabajador (Selfie + GPS) -->
+          <button onclick="switchTab('worker')" id="side-worker" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+            <i data-lucide="camera" class="w-4 h-4 shrink-0 text-amber-400"></i>
+            <span class="sidebar-label">Marcación Selfie & GPS</span>
+          </button>
+
+        </nav>
+      </div>
+
+      <!-- PIE DEL SIDEBAR -->
+      <div class="pt-4 border-t border-slate-800/80 space-y-2">
+        <div class="p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 sidebar-header-text">
+          <div class="w-8 h-8 rounded-xl bg-blue-600/20 text-cyan-400 flex items-center justify-center font-black text-xs border border-cyan-500/30">
+            D
+          </div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-extrabold text-white truncate" id="nav-user-name">Administrador</p>
+            <p class="text-[9px] text-cyan-400 font-mono truncate" id="nav-user-role">DALUPEZMAR ADMIN</p>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- VISOR UNIFICADO PRINCIPAL -->
+    <main class="flex-1 w-full relative bg-slate-950 overflow-hidden">
+      <iframe id="main-app-frame" src="/dashboard.html" class="app-frame w-full" title="Módulo DALUPEZMAR"></iframe>
+    </main>
+
+  </div>
+
+  <!-- BARRA INFERIOR RÁPIDA PARA CELULARES (ACCESO DIRECTO) -->
+  <nav class="md:hidden h-[58px] bg-slate-900/98 backdrop-blur-2xl border-t border-slate-800 grid grid-cols-5 items-center px-1 z-40 safe-bottom shadow-2xl">
     
     <button onclick="switchTab('dashboard')" id="mob-dashboard" class="mob-tab active-tab flex flex-col items-center justify-center py-1 transition cursor-pointer">
       <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
@@ -146,35 +265,30 @@
       <span class="text-[9px] font-bold mt-0.5">Personal</span>
     </button>
 
-    <button onclick="switchTab('badges')" id="mob-badges" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-white transition cursor-pointer">
-      <i data-lucide="id-card" class="w-4 h-4"></i>
-      <span class="text-[9px] font-bold mt-0.5">Carnets</span>
-    </button>
-
     <button onclick="switchTab('reports')" id="mob-reports" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-white transition cursor-pointer">
       <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
       <span class="text-[9px] font-bold mt-0.5">Tareo</span>
     </button>
 
-    <button onclick="switchTab('kiosk')" id="mob-kiosk" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-cyan-300 transition cursor-pointer">
-      <i data-lucide="scan" class="w-4 h-4"></i>
-      <span class="text-[9px] font-bold mt-0.5">Kiosco</span>
+    <button onclick="switchTab('remote')" id="mob-remote" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-emerald-300 transition cursor-pointer">
+      <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+      <span class="text-[9px] font-bold mt-0.5">Supervisor</span>
     </button>
 
-    <button onclick="switchTab('remote')" id="mob-remote" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-emerald-300 transition cursor-pointer">
-      <i data-lucide="map-pin" class="w-4 h-4"></i>
-      <span class="text-[9px] font-bold mt-0.5">Campo</span>
+    <button onclick="switchTab('worker')" id="mob-worker" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-amber-300 transition cursor-pointer">
+      <i data-lucide="camera" class="w-4 h-4 text-amber-400"></i>
+      <span class="text-[9px] font-bold mt-0.5">Selfie GPS</span>
     </button>
 
   </nav>
 
-  <!-- BANNER FLOTANTE DE INSTALACIÓN PWA -->
+  <!-- BANNER FLOTANTE PWA -->
   <div id="pwa-install-banner" class="fixed bottom-16 left-3 right-3 max-w-md mx-auto z-50 glass-panel p-3.5 rounded-2xl border border-amber-500/40 bg-slate-900/98 shadow-2xl flex items-center justify-between gap-3 hidden animate-bounce-short">
     <div class="flex items-center gap-3">
       <img src="/icons/icon-192.png" class="w-10 h-10 rounded-xl shadow-md border border-amber-500/40 object-cover">
       <div>
         <p class="text-xs font-black text-white">Instalar DALUPEZMAR</p>
-        <p class="text-[10px] text-amber-300 font-semibold">Acceso rápido sin navegador en tu celular</p>
+        <p class="text-[10px] text-amber-300 font-semibold">Acceso rápido sin navegador en tu dispositivo</p>
       </div>
     </div>
     <div class="flex items-center gap-1.5">
@@ -187,25 +301,9 @@
     </div>
   </div>
 
-  <!-- MODAL DE AYUDA DE INSTALACIÓN PARA IPHONE / IPAD (IOS) -->
-  <div id="modal-ios-install" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="glass-panel p-6 rounded-3xl max-w-sm w-full border border-slate-700 shadow-2xl space-y-4 text-center">
-      <img src="/icons/icon-192.png" class="w-16 h-16 rounded-2xl mx-auto shadow-xl border border-cyan-400/40">
-      <h3 class="text-sm font-black text-white">Instalar DALUPEZMAR en tu Teléfono</h3>
-      <p class="text-xs text-slate-300 leading-relaxed text-left">
-        1. En Safari, toca el botón <b>Compartir</b> <i data-lucide="share" class="w-4 h-4 inline text-blue-400"></i>.<br>
-        2. Selecciona <b>"Añadir a la pantalla de inicio"</b> 📲.<br>
-        3. Toca <b>"Añadir"</b> arriba a la derecha.
-      </p>
-      <button onclick="document.getElementById('modal-ios-install').classList.add('hidden')" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs">
-        Entendido
-      </button>
-    </div>
-  </div>
-
   <!-- Scripts -->
-  <script src="/js/api.js?v=3.1"></script>
-  <script src="/js/auth.js?v=3.1"></script>
+  <script src="/js/api.js?v=3.3"></script>
+  <script src="/js/auth.js?v=3.3"></script>
   <script>
     lucide.createIcons();
 
@@ -214,17 +312,63 @@
       employees: '/employees.html',
       badges: '/badge-designer.html',
       reports: '/reports.html',
+      branches: '/branches.html',
       kiosk: '/kiosk.html',
-      remote: '/remote-attendance.html'
+      remote: '/remote-attendance.html',
+      worker: '/worker-punch.html'
     };
 
-    let currentActiveTab = 'dashboard';
+    const MODULE_TITLES = {
+      dashboard: 'Panel de Control',
+      employees: 'Gestión de Personal (87)',
+      badges: 'Diseñador de Fotochecks',
+      reports: 'Tareo & Planillas (Excel)',
+      branches: 'Sedes & Geocercas GPS',
+      kiosk: 'Kiosco Escáner QR',
+      remote: 'Supervisor Móvil de Campo',
+      worker: 'Portal del Trabajador (Selfie & GPS)'
+    };
+
+    let isSidebarOpen = window.innerWidth >= 769;
+
+    function toggleSidebar(forceState) {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      
+      if (typeof forceState === 'boolean') {
+        isSidebarOpen = forceState;
+      } else {
+        isSidebarOpen = !isSidebarOpen;
+      }
+
+      if (window.innerWidth < 769) {
+        // En celulares: slide over drawer
+        if (isSidebarOpen) {
+          sidebar.classList.remove('sidebar-collapsed');
+          backdrop.classList.remove('hidden');
+        } else {
+          sidebar.classList.add('sidebar-collapsed');
+          backdrop.classList.add('hidden');
+        }
+      } else {
+        // En PC: expandir / colapsar
+        backdrop.classList.add('hidden');
+        if (isSidebarOpen) {
+          sidebar.classList.remove('sidebar-collapsed');
+        } else {
+          sidebar.classList.add('sidebar-collapsed');
+        }
+      }
+    }
 
     function switchTab(tabKey) {
       if (!MODULE_ROUTES[tabKey]) return;
-      currentActiveTab = tabKey;
 
       const frame = document.getElementById('main-app-frame');
+      const titleEl = document.getElementById('current-view-title');
+
+      if (titleEl) titleEl.textContent = MODULE_TITLES[tabKey] || 'DALUPEZMAR';
+
       if (frame) {
         frame.style.opacity = '0.3';
         frame.src = MODULE_ROUTES[tabKey];
@@ -234,18 +378,18 @@
         };
       }
 
-      // Actualizar pestañas Desktop
-      document.querySelectorAll('.nav-tab').forEach(btn => {
+      // Actualizar sidebar tabs
+      document.querySelectorAll('.sidebar-tab').forEach(btn => {
         btn.classList.remove('active-tab');
         btn.classList.add('text-slate-300');
       });
-      const activeNav = document.getElementById(`nav-${tabKey}`);
-      if (activeNav) {
-        activeNav.classList.add('active-tab');
-        activeNav.classList.remove('text-slate-300');
+      const activeSide = document.getElementById(`side-${tabKey}`);
+      if (activeSide) {
+        activeSide.classList.add('active-tab');
+        activeSide.classList.remove('text-slate-300');
       }
 
-      // Actualizar pestañas Móvil
+      // Actualizar mobile bottom tabs
       document.querySelectorAll('.mob-tab').forEach(btn => {
         btn.classList.remove('active-tab');
         btn.classList.add('text-slate-400');
@@ -256,7 +400,22 @@
         activeMob.classList.remove('text-slate-400');
       }
 
+      // En móviles, cerrar el sidebar automáticamente al seleccionar una opción
+      if (window.innerWidth < 769) {
+        toggleSidebar(false);
+      }
+
       lucide.createIcons();
+    }
+
+    function handleRoleSwitch(role) {
+      if (role === 'ADMIN') {
+        switchTab('dashboard');
+      } else if (role === 'SUPERVISOR') {
+        switchTab('remote');
+      } else if (role === 'WORKER') {
+        switchTab('worker');
+      }
     }
 
     function toggleUnifiedTheme() {
@@ -279,11 +438,13 @@
       }
     }
 
-    // =========================================================================
-    // LÓGICA DE INSTALACIÓN PWA
-    // =========================================================================
-    let deferredPrompt = null;
+    // Inicializar estado del sidebar en celulares
+    if (window.innerWidth < 769) {
+      toggleSidebar(false);
+    }
 
+    // PWA Install prompt
+    let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -296,29 +457,16 @@
     function triggerPwaInstall() {
       if (deferredPrompt) {
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-          deferredPrompt = null;
-          document.getElementById('pwa-install-banner')?.classList.add('hidden');
-        });
+        deferredPrompt = null;
+        document.getElementById('pwa-install-banner')?.classList.add('hidden');
       } else {
-        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIos) {
-          document.getElementById('modal-ios-install')?.classList.remove('hidden');
-        } else {
-          alert('Para instalar DALUPEZMAR:\nEn Chrome/Edge, haz clic en los 3 puntos ⋮ y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
-        }
+        alert('Para instalar DALUPEZMAR:\nEn tu navegador Chrome o Edge, toca los 3 puntos ⋮ y presiona "Instalar aplicación" o "Añadir a pantalla principal".');
       }
     }
 
     function dismissInstallBanner() {
       document.getElementById('pwa-install-banner')?.classList.add('hidden');
       sessionStorage.setItem('pwa_dismissed', 'true');
-    }
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(console.warn);
-      });
     }
   </script>
 </body>

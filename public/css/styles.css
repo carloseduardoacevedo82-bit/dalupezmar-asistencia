@@ -669,3 +669,59 @@ body.light-mode thead tr th {
   animation: bounceShort 2.5s infinite ease-in-out;
 }
 
+/* ==========================================================================
+   ALTO CONTRASTE Y LEGIBILIDAD EN MODO CLARO (CABECERA Y MENÚ LATERAL)
+   ========================================================================== */
+.light-mode header,
+body.light-mode header,
+.light-mode nav.glass-nav,
+body.light-mode nav.glass-nav {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-bottom: 1.5px solid #e2e8f0 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-mode header h1,
+.light-mode header h2,
+.light-mode header span.text-white,
+.light-mode header span.font-black,
+body.light-mode header h1,
+body.light-mode header span.text-white,
+body.light-mode header span.font-black {
+  color: #0f172a !important;
+}
+
+.light-mode header p,
+.light-mode header .text-slate-400,
+body.light-mode header p,
+body.light-mode header .text-slate-400 {
+  color: #475569 !important;
+}
+
+.light-mode #app-sidebar,
+body.light-mode #app-sidebar {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-right: 1.5px solid #e2e8f0 !important;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.06) !important;
+}
+
+.light-mode #app-sidebar .sidebar-tab,
+body.light-mode #app-sidebar .sidebar-tab {
+  color: #334155 !important;
+}
+
+.light-mode #app-sidebar .sidebar-tab:hover,
+body.light-mode #app-sidebar .sidebar-tab:hover {
+  background-color: #f1f5f9 !important;
+  color: #0284c7 !important;
+}
+
+.light-mode #app-sidebar .sidebar-tab.active-tab,
+body.light-mode #app-sidebar .sidebar-tab.active-tab {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+}
+
+

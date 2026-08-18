@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sitios y Sedes de Marcación GPS | DALUPEZMAR</title>
+  
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#002855">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=3.2">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- CABECERA PRINCIPAL -->
+  <nav class="glass-nav sticky top-0 z-40 px-6 py-3 flex items-center justify-between no-print border-b border-slate-800">
+    <div class="flex items-center gap-3.5">
+      <img src="/icons/icon-192.png" alt="DALUPEZMAR" class="w-10 h-10 rounded-2xl shadow-lg border border-cyan-400/40 object-cover">
+      <div>
+        <h1 class="text-base font-black tracking-tight text-white flex items-center gap-2">
+          Sedes & Geocercas GPS <span class="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">CONFIGURACIÓN</span>
+        </h1>
+        <p class="text-[11px] text-slate-400 font-semibold">Asignación de Sitios Autorizados de Marcación</p>
+      </div>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 p-2.5 sm:p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- DESCRIPCIÓN Y ACCIONES -->
+    <div class="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div>
+        <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+          <i data-lucide="map-pin" class="w-5 h-5 text-cyan-400"></i> Sitios de Trabajo y Geocercas Satelitales
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">
+          Configura las coordenadas GPS y el radio permitido de marcación en metros para cada planta.
+        </p>
+      </div>
+      <button onclick="detectAdminCurrentGps()" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer">
+        <i data-lucide="crosshair" class="w-4 h-4"></i> Capturar Mi GPS Actual
+      </button>
+    </div>
+
+    <!-- TARJETA GPS ACTUAL CAPTURADO -->
+    <div id="admin-gps-box" class="glass-panel p-4 rounded-2xl border border-cyan-500/40 bg-cyan-950/20 hidden flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-pulse"></div>
+        <div>
+          <p class="text-xs font-bold text-white">Coordenadas del Dispositivo:</p>
+          <p id="admin-gps-text" class="text-xs text-cyan-300 font-mono font-bold"></p>
+        </div>
+      </div>
+      <p class="text-[11px] text-slate-400">Puedes usar estas coordenadas para actualizar la sede.</p>
+    </div>
+
+    <!-- LISTADO DE SEDES EN CUADRÍCULA -->
+    <div id="branches-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div class="text-center py-10 text-slate-500 text-xs col-span-full">Cargando sedes y geocercas...</div>
+    </div>
+
+  </main>
+
+  <!-- MODAL PARA EDITAR GEOCERCA DE SEDE -->
+  <div id="modal-edit-branch" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-4 h-4 text-cyan-400"></i> Configurar Sede & Geocerca GPS
+        </h3>
+        <button onclick="closeBranchModal()" class="p-1 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-edit-branch" class="space-y-4">
+        <input type="hidden" id="edit-branch-id">
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Nombre de la Sede / Planta *</label>
+          <input type="text" id="edit-branch-name" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Dirección Física</label>
+          <input type="text" id="edit-branch-address" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Latitud GPS</label>
+            <input type="number" step="any" id="edit-branch-lat" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono font-bold">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Longitud GPS</label>
+            <input type="number" step="any" id="edit-branch-lng" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono font-bold">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Radio Permitido de Marcación (Metros)</label>
+          <input type="number" id="edit-branch-radius" value="300" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono font-bold">
+          <p class="text-[10px] text-slate-400 mt-1">Los trabajadores a más de esta distancia serán alertados.</p>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeBranchModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs">Cancelar</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25">Guardar Geocerca</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=3.2"></script>
+  <script src="/js/auth.js?v=3.2"></script>
+  <script>
+    lucide.createIcons();
+
+    let allBranches = [];
+    let currentAdminCoords = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadBranches();
+    });
+
+    async function loadBranches() {
+      const container = document.getElementById('branches-grid');
+      try {
+        const res = await api.employees.getBranches();
+        if (res && res.data) {
+          allBranches = res.data;
+          container.innerHTML = allBranches.map(b => {
+            const hasGps = b.latitude && b.longitude;
+            const mapsUrl = hasGps ? `https://www.google.com/maps?q=${b.latitude},${b.longitude}` : '#';
+
+            return `
+              <div class="glass-panel p-5 rounded-3xl border border-slate-800 space-y-3.5 shadow-lg flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black ${b.is_active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}">
+                      ${b.code || 'SEDE'}
+                    </span>
+                    <span class="text-[11px] text-cyan-400 font-mono font-bold">Radio: ${b.radius_meters || 150}m</span>
+                  </div>
+
+                  <h3 class="text-sm font-extrabold text-white">${b.name}</h3>
+                  <p class="text-xs text-slate-400 mt-0.5">${b.address || 'Sin dirección registrada'}</p>
+                </div>
+
+                <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1 font-mono text-xs">
+                  <p class="text-slate-300 font-semibold flex items-center justify-between">
+                    <span>Lat: ${b.latitude ? Number(b.latitude).toFixed(5) : 'No definida'}</span>
+                    <span>Lng: ${b.longitude ? Number(b.longitude).toFixed(5) : 'No definida'}</span>
+                  </p>
+                  ${hasGps ? `<a href="${mapsUrl}" target="_blank" class="text-[10px] text-cyan-400 hover:underline flex items-center gap-1 font-bold pt-1"><i data-lucide="external-link" class="w-3 h-3"></i> Ver en Google Maps</a>` : ''}
+                </div>
+
+                <div class="pt-2 border-t border-slate-800 flex gap-2">
+                  <button onclick="openEditBranchModal(${b.id})" class="w-full py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Configurar Geocerca
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          lucide.createIcons();
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="text-center py-8 text-rose-400 text-xs">Error al cargar sedes: ${err.message}</div>`;
+      }
+    }
+
+    function openEditBranchModal(id) {
+      const b = allBranches.find(x => x.id === id);
+      if (!b) return;
+
+      document.getElementById('edit-branch-id').value = b.id;
+      document.getElementById('edit-branch-name').value = b.name;
+      document.getElementById('edit-branch-address').value = b.address || '';
+      document.getElementById('edit-branch-lat').value = b.latitude || (currentAdminCoords ? currentAdminCoords.lat : '');
+      document.getElementById('edit-branch-lng').value = b.longitude || (currentAdminCoords ? currentAdminCoords.lng : '');
+      document.getElementById('edit-branch-radius').value = b.radius_meters || 300;
+
+      document.getElementById('modal-edit-branch').classList.remove('hidden');
+    }
+
+    function closeBranchModal() {
+      document.getElementById('modal-edit-branch').classList.add('hidden');
+    }
+
+    document.getElementById('form-edit-branch')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('edit-branch-id').value;
+      const name = document.getElementById('edit-branch-name').value.trim();
+      const address = document.getElementById('edit-branch-address').value.trim();
+      const latitude = document.getElementById('edit-branch-lat').value;
+      const longitude = document.getElementById('edit-branch-lng').value;
+      const radius_meters = document.getElementById('edit-branch-radius').value;
+
+      try {
+        showToast('Guardando Geocerca de Sede...', 'info');
+        await api.employees.updateBranchGeofence(id, {
+          name,
+          address,
+          latitude: latitude ? Number(latitude) : null,
+          longitude: longitude ? Number(longitude) : null,
+          radius_meters: Number(radius_meters) || 300
+        });
+
+        showToast('Geocerca GPS actualizada con éxito.', 'success');
+        closeBranchModal();
+        await loadBranches();
+      } catch (err) {
+        showToast('Error al guardar: ' + err.message, 'error');
+      }
+    });
+
+    function detectAdminCurrentGps() {
+      if (!navigator.geolocation) {
+        alert('GPS no soportado en este dispositivo.');
+        return;
+      }
+
+      showToast('Obteniendo coordenadas satelitales...', 'info');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          currentAdminCoords = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+          };
+
+          const box = document.getElementById('admin-gps-box');
+          const text = document.getElementById('admin-gps-text');
+          text.textContent = `Lat: ${currentAdminCoords.lat.toFixed(6)}, Lng: ${currentAdminCoords.lng.toFixed(6)} (±${Math.round(pos.coords.accuracy)}m)`;
+          box.classList.remove('hidden');
+
+          showToast('GPS capturado con éxito.', 'success');
+        },
+        (err) => {
+          alert('No se pudo obtener GPS: ' + err.message);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+  </script>
+</body>
+</html>
