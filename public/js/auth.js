@@ -72,10 +72,19 @@ function updateThemeButtonsUI(theme) {
   const isLight = theme === 'light';
   const btns = document.querySelectorAll('.btn-theme-toggle');
   btns.forEach(btn => {
-    btn.innerHTML = isLight 
-      ? '<i data-lucide="moon" class="w-4 h-4 text-slate-800"></i><span class="hidden sm:inline text-xs font-bold text-slate-800">Modo Oscuro</span>'
-      : '<i data-lucide="sun" class="w-4 h-4 text-amber-300"></i><span class="hidden sm:inline text-xs font-bold text-amber-300">Modo Claro</span>';
     btn.setAttribute('title', isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro');
+    btn.className = `btn-theme-toggle relative w-12 h-6.5 rounded-full transition-all duration-300 p-0.5 flex items-center cursor-pointer select-none shadow-sm ${
+      isLight ? 'bg-sky-100 border border-sky-300 justify-end' : 'bg-slate-800 border border-slate-700 justify-start'
+    }`;
+    btn.innerHTML = `
+      <span class="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 transform shadow-sm ${
+        isLight 
+          ? 'bg-white text-indigo-600 shadow-sky-200 rotate-0' 
+          : 'bg-slate-900 text-amber-400 shadow-slate-950 rotate-180'
+      }">
+        <i data-lucide="${isLight ? 'moon' : 'sun'}" class="w-3.5 h-3.5"></i>
+      </span>
+    `;
   });
   if (window.lucide && lucide.createIcons) lucide.createIcons();
 }
