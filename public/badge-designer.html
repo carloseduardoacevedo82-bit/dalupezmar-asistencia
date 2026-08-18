@@ -128,18 +128,51 @@
           <span class="text-[11px] text-cyan-400 font-bold">Celular / PC</span>
         </div>
 
-        <!-- Input para Subir o Tomar Foto con la Cámara del Celular -->
-        <div>
-          <label class="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-2">
-            <i data-lucide="camera" class="w-4 h-4 text-cyan-400"></i> Foto de Perfil (Galería o Cámara)
-          </label>
-          <div class="flex items-center gap-3">
-            <label class="flex-1 cursor-pointer py-3 px-4 rounded-xl border border-dashed border-cyan-500/40 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 transition">
-              <i data-lucide="upload" class="w-4 h-4"></i> Subir / Tomar Foto
-              <input type="file" id="quick-photo-input" accept="image/*" capture="user" class="hidden">
+        <!-- Selector Dual de Foto para Fotocheck (Cámara en Vivo vs Archivo / Galería) -->
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-200 uppercase tracking-wide flex items-center gap-1.5">
+              <i data-lucide="image" class="w-4 h-4 text-cyan-400"></i> Foto de Perfil
             </label>
-            <div id="photo-preview-thumb" class="w-12 h-12 rounded-xl border border-slate-700 overflow-hidden bg-slate-900 hidden">
-              <img id="thumb-img" src="" class="w-full h-full object-cover">
+            <span class="text-[10px] text-cyan-400 font-bold">Escoge una opción</span>
+          </div>
+
+          <!-- Selector de Modo -->
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btn-badge-photo-mode-file" onclick="setBadgePhotoMode('file')" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition bg-blue-600/20 text-blue-400 border-blue-500/40 cursor-pointer">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i> Subir Archivo
+            </button>
+            <button type="button" id="btn-badge-photo-mode-camera" onclick="setBadgePhotoMode('camera')" class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer">
+              <i data-lucide="camera" class="w-3.5 h-3.5"></i> Tomar con Cámara
+            </button>
+          </div>
+
+          <!-- Opción 1: Subir Archivo -->
+          <div id="badge-photo-file-container" class="space-y-1.5">
+            <input type="file" id="quick-photo-input" accept="image/png,image/jpeg,image/webp,image/*" onchange="previewBadgeFilePhoto(event)" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-1.5 text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer">
+          </div>
+
+          <!-- Opción 2: Cámara en Vivo -->
+          <div id="badge-photo-camera-container" class="hidden space-y-2">
+            <div class="relative w-full max-w-[200px] mx-auto aspect-square rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-cyan-500/40 shadow-inner flex items-center justify-center">
+              <video id="badge-camera-video" autoplay playsinline class="w-full h-full object-cover hidden"></video>
+              <div id="badge-camera-placeholder" class="text-center p-3">
+                <i data-lucide="camera" class="w-7 h-7 text-cyan-400/60 mx-auto mb-1"></i>
+                <p class="text-xs text-slate-300 font-bold">Cámara no iniciada</p>
+                <p class="text-[9px] text-slate-500">Toca "Iniciar Cámara" para capturar</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-1.5">
+              <button type="button" id="btn-start-badge-camera" onclick="startBadgeCamera()" class="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs flex items-center gap-1 shadow-md cursor-pointer">
+                <i data-lucide="video" class="w-3.5 h-3.5"></i> Iniciar Cámara
+              </button>
+              <button type="button" id="btn-switch-badge-camera" onclick="switchBadgeCameraFacing()" class="px-2.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1 hidden cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Cambiar
+              </button>
+              <button type="button" id="btn-capture-badge-camera" onclick="captureBadgePhoto()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1 shadow-md hidden cursor-pointer">
+                <i data-lucide="camera" class="w-3.5 h-3.5"></i> Capturar Foto 📸
+              </button>
             </div>
           </div>
         </div>

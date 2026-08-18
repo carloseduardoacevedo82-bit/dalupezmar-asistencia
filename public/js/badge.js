@@ -76,34 +76,6 @@ function initEventListeners() {
     if (el) el.style.display = e.target.checked ? 'flex' : 'none';
   });
 
-  // 5. Captura y Subida de Foto desde Celular / PC
-  const photoInput = document.getElementById('quick-photo-input');
-  if (photoInput) {
-    photoInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        pendingPhotoFile = file;
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          // Actualizar miniatura y foto del carnet en vivo
-          const thumb = document.getElementById('photo-preview-thumb');
-          const thumbImg = document.getElementById('thumb-img');
-          const badgePhoto = document.getElementById('badge-photo');
-
-          if (thumb && thumbImg) {
-            thumbImg.src = evt.target.result;
-            thumb.classList.remove('hidden');
-          }
-          if (badgePhoto) {
-            badgePhoto.src = evt.target.result;
-          }
-          showToast('Foto cargada. Presiona "Guardar Cambios" para confirmar.', 'info');
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
   // 6. Guardar Cambios de Datos y Foto
   document.getElementById('btn-save-quick-changes')?.addEventListener('click', handleSaveQuickChanges);
 
@@ -468,8 +440,149 @@ function renderBadge(emp) {
     }
   }
 
+let badgeCameraStream = null;
+let badgeCameraFacing = 'user'; // 'user' (frontal) o 'environment' (trasera)
+let badgeCapturedBlob = null;
+
+/**
+ * Cambiar entre modo Archivo y modo Cámara en Diseñador de Fotochecks
+ */
+window.setBadgePhotoMode = function(mode) {
+  const btnFile = document.getElementById('btn-badge-photo-mode-file');
+  const btnCamera = document.getElementById('btn-badge-photo-mode-camera');
+  const containerFile = document.getElementById('badge-photo-file-container');
+  const containerCamera = document.getElementById('badge-photo-camera-container');
+
+  if (mode === 'camera') {
+    if (btnCamera) btnCamera.className = 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition bg-cyan-600/20 text-cyan-400 border-cyan-500/40 cursor-pointer';
+    if (btnFile) btnFile.className = 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer';
+    containerCamera?.classList.remove('hidden');
+    containerFile?.classList.add('hidden');
+  } else {
+    if (btnFile) btnFile.className = 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition bg-blue-600/20 text-blue-400 border-blue-500/40 cursor-pointer';
+    if (btnCamera) btnCamera.className = 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 border transition bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer';
+    containerFile?.classList.remove('hidden');
+    containerCamera?.classList.add('hidden');
+    stopBadgeCamera();
+  }
   lucide.createIcons();
-}
+};
+
+/**
+ * Previsualizar archivo cargado en el fotocheck
+ */
+window.previewBadgeFilePhoto = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  pendingPhotoFile = file;
+  badgeCapturedBlob = null;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const badgePhoto = document.getElementById('badge-photo');
+    if (badgePhoto) badgePhoto.src = evt.target.result;
+    showToast('Foto cargada en vista previa. Presiona "Guardar y Actualizar Fotocheck" para confirmar.', 'info');
+  };
+  reader.readAsDataURL(file);
+};
+
+/**
+ * Iniciar Cámara en Vivo para Diseñador de Fotochecks
+ */
+window.startBadgeCamera = async function() {
+  const video = document.getElementById('badge-camera-video');
+  const placeholder = document.getElementById('badge-camera-placeholder');
+  const btnStart = document.getElementById('btn-start-badge-camera');
+  const btnSwitch = document.getElementById('btn-switch-badge-camera');
+  const btnCapture = document.getElementById('btn-capture-badge-camera');
+
+  stopBadgeCamera();
+
+  try {
+    const constraints = {
+      video: {
+        facingMode: badgeCameraFacing,
+        width: { ideal: 640 },
+        height: { ideal: 640 }
+      },
+      audio: false
+    };
+
+    badgeCameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+    if (video) {
+      video.srcObject = badgeCameraStream;
+      video.classList.remove('hidden');
+    }
+    placeholder?.classList.add('hidden');
+
+    btnStart?.classList.add('hidden');
+    btnSwitch?.classList.remove('hidden');
+    btnCapture?.classList.remove('hidden');
+  } catch (err) {
+    showToast('No se pudo acceder a la cámara: ' + err.message, 'error');
+  }
+};
+
+/**
+ * Alternar entre cámara frontal y trasera en Diseñador
+ */
+window.switchBadgeCameraFacing = async function() {
+  badgeCameraFacing = badgeCameraFacing === 'user' ? 'environment' : 'user';
+  await startBadgeCamera();
+};
+
+/**
+ * Capturar Foto en Vivo e Inyectar en el Fotocheck
+ */
+window.captureBadgePhoto = function() {
+  const video = document.getElementById('badge-camera-video');
+  if (!video || !badgeCameraStream) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 480;
+  canvas.height = video.videoHeight || 480;
+
+  const ctx = canvas.getContext('2d');
+  if (badgeCameraFacing === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob((blob) => {
+    badgeCapturedBlob = blob;
+    pendingPhotoFile = blob;
+
+    const badgePhoto = document.getElementById('badge-photo');
+    if (badgePhoto) {
+      badgePhoto.src = URL.createObjectURL(blob);
+    }
+
+    showToast('¡Foto capturada y aplicada al fotocheck! Presiona "Guardar y Actualizar Fotocheck".', 'success');
+    stopBadgeCamera();
+  }, 'image/jpeg', 0.9);
+};
+
+/**
+ * Detener Cámara de Fotochecks
+ */
+window.stopBadgeCamera = function() {
+  if (badgeCameraStream) {
+    badgeCameraStream.getTracks().forEach(t => t.stop());
+    badgeCameraStream = null;
+  }
+  const video = document.getElementById('badge-camera-video');
+  const placeholder = document.getElementById('badge-camera-placeholder');
+  const btnStart = document.getElementById('btn-start-badge-camera');
+  const btnSwitch = document.getElementById('btn-switch-badge-camera');
+  const btnCapture = document.getElementById('btn-capture-badge-camera');
+
+  if (video) video.classList.add('hidden');
+  if (placeholder) placeholder?.classList.remove('hidden');
+  if (btnStart) btnStart.classList.remove('hidden');
+  if (btnSwitch) btnSwitch.classList.add('hidden');
+  if (btnCapture) btnCapture.classList.add('hidden');
+};
 
 /**
  * Guardar Cambios de Edición Rápida (Nombre, Tipo Doc, DNI, Cargo, Sede, Foto)
