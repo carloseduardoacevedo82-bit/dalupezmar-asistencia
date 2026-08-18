@@ -565,6 +565,39 @@ body.light-mode .fixed.inset-0.bg-slate-950\/80 {
   backdrop-filter: blur(10px) !important;
 }
 
+/* Fotos Ampliadas y Distribución Espaciosa en Tablas */
+table td img[width="56"],
+table td img.w-14 {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  border-radius: 16px !important;
+  object-fit: cover !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-mode table td img[width="56"],
+body.light-mode table td img.w-14 {
+  border: 2px solid #e2e8f0 !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light-mode tbody tr td {
+  padding-top: 1.1rem !important;
+  padding-bottom: 1.1rem !important;
+}
+
+body.light-mode thead tr th {
+  padding-top: 1.2rem !important;
+  padding-bottom: 1.2rem !important;
+  font-size: 0.78rem !important;
+  color: #475569 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+}
+
+
 /* Print Rules */
 @media print {
   body {

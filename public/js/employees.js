@@ -160,62 +160,94 @@ function renderEmployeesTable(list) {
   tbody.innerHTML = list.map(emp => {
     const isInactive = emp.status === 'INACTIVE' || emp.status === 'SUSPENDED';
     const docType = emp.document_type || (emp.document_number && emp.document_number.length === 9 ? 'CEX' : 'DNI');
-    const area = (emp.position_name && emp.position_name.toUpperCase().includes('TROQUELADO')) 
+    const positionName = emp.position_name || 'OPERARIO DE PRODUCCIÓN';
+    
+    // Tag de color según puesto
+    let posBadgeColor = 'text-slate-400 bg-slate-800/40 border-slate-700/50';
+    if (positionName.includes('TROQUELADO')) {
+      posBadgeColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+    } else if (positionName.includes('EXTERIOR') || positionName.includes('EXTERNA')) {
+      posBadgeColor = 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+    } else if (positionName.includes('GERENTE')) {
+      posBadgeColor = 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+    } else if (positionName.includes('SUPERVISOR')) {
+      posBadgeColor = 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30';
+    }
+
+    const area = (positionName.toUpperCase().includes('TROQUELADO')) 
       ? 'Troquelado de Anillas' 
       : (emp.department_name || 'Producción');
 
     return `
       <tr class="hover:bg-slate-900/50 transition">
-        <td class="px-6 py-4 flex items-center gap-3">
-          <img src="${emp.photo_url || DEFAULT_AVATAR}" width="40" height="40" loading="lazy" class="w-10 h-10 min-w-[40px] rounded-2xl object-cover border border-slate-700 shadow-sm" onerror="this.onerror=null; this.src=DEFAULT_AVATAR;">
+        <!-- Colaborador con Foto Ampliada -->
+        <td class="px-6 py-4 flex items-center gap-4 min-w-[280px]">
+          <div class="relative group">
+            <img src="${emp.photo_url || DEFAULT_AVATAR}" width="56" height="56" loading="lazy" class="w-14 h-14 min-w-[56px] min-h-[56px] rounded-2xl object-cover border-2 border-slate-700/80 shadow-md transition transform group-hover:scale-105" onerror="this.onerror=null; this.src=DEFAULT_AVATAR;">
+          </div>
           <div>
-            <p class="font-bold text-white uppercase text-xs">${emp.first_name} ${emp.last_name}</p>
-            <p class="text-[10px] text-slate-400 font-mono">${emp.employee_code} • ${emp.email || 'DALUPEZMAR'}</p>
+            <p class="font-extrabold text-white text-sm uppercase tracking-tight leading-snug">${emp.first_name} ${emp.last_name}</p>
+            <p class="text-xs text-slate-400 font-mono mt-0.5">${emp.employee_code} <span class="text-slate-600">•</span> ${emp.email || 'DALUPEZMAR'}</p>
           </div>
         </td>
-        <td class="px-6 py-4 font-mono font-bold text-slate-200">
-          <span class="text-[10px] text-cyan-400 font-bold block">${docType}</span>
-          ${emp.document_number}
+
+        <!-- Documento -->
+        <td class="px-6 py-4 min-w-[140px]">
+          <span class="inline-block px-2 py-0.5 rounded text-[11px] font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 mb-1">${docType}</span>
+          <p class="font-mono font-extrabold text-sm text-slate-200">${emp.document_number}</p>
         </td>
-        <td class="px-6 py-4">
-          <p class="font-semibold text-slate-200 text-xs">${area}</p>
-          <p class="text-[10px] ${emp.position_name && emp.position_name.includes('TROQUELADO') ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${emp.position_name || 'OPERARIO DE PRODUCCIÓN'}</p>
+
+        <!-- Área / Cargo -->
+        <td class="px-6 py-4 min-w-[200px]">
+          <p class="font-extrabold text-slate-200 text-xs uppercase">${area}</p>
+          <span class="inline-block mt-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${posBadgeColor}">
+            ${positionName}
+          </span>
         </td>
-        <td class="px-6 py-4 font-bold text-xs text-cyan-300">
-          PECEPE S.A.C.
+
+        <!-- Sede / Planta -->
+        <td class="px-6 py-4 min-w-[140px]">
+          <p class="font-black text-sm text-blue-400">PECEPE</p>
+          <p class="text-xs font-bold text-slate-400">S.A.C.</p>
         </td>
-        <td class="px-6 py-4">
-          <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 font-mono text-[11px] text-slate-300">
+
+        <!-- Turno Asignado -->
+        <td class="px-6 py-4 min-w-[170px]">
+          <span class="inline-block px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs font-semibold text-slate-300">
             ${emp.shift_name ? emp.shift_name.split('(')[0] : 'Estándar 07:00-16:00'}
           </span>
         </td>
-        <td class="px-6 py-4">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${!isInactive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+
+        <!-- Estado -->
+        <td class="px-6 py-4 min-w-[130px]">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-extrabold ${!isInactive ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'}">
             ${!isInactive ? 'ACTIVO' : 'CESADO / BAJA'}
           </span>
         </td>
-        <td class="px-6 py-4 text-center">
-          <div class="flex items-center justify-center gap-2">
+
+        <!-- Acciones -->
+        <td class="px-6 py-4 text-center min-w-[140px]">
+          <div class="flex items-center justify-center gap-2.5">
             
             <!-- Ver Fotocheck Oficial vinculado -->
-            <a href="/badge-designer.html?id=${emp.id}" title="Ver y Diseñar Fotocheck" class="p-2 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 transition cursor-pointer">
-              <i data-lucide="badge-check" class="w-4 h-4"></i>
+            <a href="/badge-designer.html?id=${emp.id}" title="Ver y Diseñar Fotocheck" class="p-2.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/25 transition cursor-pointer">
+              <i data-lucide="badge-check" class="w-4.5 h-4.5"></i>
             </a>
 
             <!-- Editar Ficha y Foto -->
-            <button onclick="openEmployeeModal(${emp.id})" title="Editar Datos y Foto" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
-              <i data-lucide="pencil" class="w-4 h-4"></i>
+            <button onclick="openEmployeeModal(${emp.id})" title="Editar Datos y Foto" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="pencil" class="w-4.5 h-4.5"></i>
             </button>
 
             ${!isInactive ? `
               <!-- Botón Dar de Baja (Mover a Carpeta de Bajas) -->
-              <button onclick="openTerminateModal(${emp.id})" title="Dar de Baja a Personal Cesado" class="p-2 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 transition cursor-pointer">
-                <i data-lucide="user-minus" class="w-4 h-4"></i>
+              <button onclick="openTerminateModal(${emp.id})" title="Dar de Baja a Personal Cesado" class="p-2.5 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/25 transition cursor-pointer">
+                <i data-lucide="user-minus" class="w-4.5 h-4.5"></i>
               </button>
             ` : `
               <!-- Botón Reactivar (Mover a Carpeta de Activos) -->
-              <button onclick="reactivateEmployee(${emp.id})" title="Reincorporar a Personal Activo" class="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-[10px] flex items-center gap-1.5 transition cursor-pointer">
-                <i data-lucide="user-check" class="w-3.5 h-3.5"></i> Reactivar
+              <button onclick="reactivateEmployee(${emp.id})" title="Reincorporar a Personal Activo" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer">
+                <i data-lucide="user-check" class="w-4 h-4"></i> Reactivar
               </button>
             `}
 
