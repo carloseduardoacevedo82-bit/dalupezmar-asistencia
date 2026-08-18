@@ -1,41 +1,19 @@
 /**
- * Lógica para marcación remota de asistencia con GPS y Módulo de Supervisor de Campo
+ * Lógica para Supervisor de Campo: Escáner QR frontal/trasero, GPS y marcación rápida
  */
 let userCoords = null;
-let currentMobileRole = 'WORKER';
 let mobileQrScanner = null;
 let isCamActive = false;
 let allActiveEmployees = [];
+let isScanningCooldown = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  startRemoteClock();
   obtainGeolocation();
   await loadSupervisorEmployees();
   await loadMobileTodayLogs();
 
   document.getElementById('btn-refresh-gps')?.addEventListener('click', obtainGeolocation);
 });
-
-function startRemoteClock() {
-  const clockEl = document.getElementById('remote-clock');
-  const dateEl = document.getElementById('remote-date');
-
-  function update() {
-    const now = new Date();
-    if (clockEl) clockEl.textContent = now.toLocaleTimeString('es-PE', { hour12: false });
-    if (dateEl) {
-      dateEl.textContent = now.toLocaleDateString('es-PE', {
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-  }
-
-  update();
-  setInterval(update, 1000);
-}
 
 /**
  * Obtener Coordenadas Satelitales GPS
@@ -52,7 +30,7 @@ function obtainGeolocation() {
     return;
   }
 
-  if (title) title.textContent = 'Obteniendo GPS en tiempo real...';
+  if (title) title.textContent = 'GPS Satelital en tiempo real...';
   if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse';
 
   navigator.geolocation.getCurrentPosition(
@@ -63,7 +41,7 @@ function obtainGeolocation() {
         accuracy: position.coords.accuracy
       };
 
-      if (title) title.textContent = 'Posicionamiento GPS Satelital Activo';
+      if (title) title.textContent = 'GPS Satelital Activo';
       if (coordsEl) coordsEl.textContent = `Lat: ${userCoords.lat.toFixed(5)}, Lng: ${userCoords.lng.toFixed(5)} (±${Math.round(userCoords.accuracy)}m)`;
       if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-lg shadow-emerald-500/50';
 
@@ -83,49 +61,6 @@ function obtainGeolocation() {
 }
 
 /**
- * Alternar entre Modo Operario y Modo Supervisor de Campo
- */
-window.switchMobileRole = function(role) {
-  currentMobileRole = role;
-
-  const btnWorker = document.getElementById('tab-mode-worker');
-  const btnSup = document.getElementById('tab-mode-supervisor');
-  const viewWorker = document.getElementById('view-worker-mode');
-  const viewSup = document.getElementById('view-supervisor-mode');
-
-  if (role === 'WORKER') {
-    btnWorker.className = 'py-2 px-3 rounded-xl bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer';
-    btnSup.className = 'py-2 px-3 rounded-xl text-slate-400 hover:text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer';
-    viewWorker.classList.remove('hidden');
-    viewSup.classList.add('hidden');
-    if (isCamActive) toggleMobileCamera();
-  } else {
-    btnSup.className = 'py-2 px-3 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer';
-    btnWorker.className = 'py-2 px-3 rounded-xl text-slate-400 hover:text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer';
-    viewSup.classList.remove('hidden');
-    viewWorker.classList.add('hidden');
-    loadMobileTodayLogs();
-  }
-  lucide.createIcons();
-};
-
-/**
- * Marcación del Trabajador
- */
-window.submitRemotePunch = async function(punchType) {
-  const docInput = document.getElementById('remote-doc-input');
-  const docNumber = docInput?.value?.trim();
-
-  if (!docNumber) {
-    alert('Por favor, ingresa tu número de DNI o código de trabajador.');
-    docInput?.focus();
-    return;
-  }
-
-  await executePunch(docNumber, punchType, 'REMOTE_MOBILE');
-};
-
-/**
  * Marcación Rápida de Supervisor para un Colaborador seleccionado
  */
 window.submitSupervisorPunch = async function(punchType) {
@@ -141,44 +76,50 @@ window.submitSupervisorPunch = async function(punchType) {
 };
 
 /**
- * Ejecución centralizada de Marcación con GPS
+ * Ejecución centralizada de Marcación con GPS y Universal Token Reader
  */
-async function executePunch(tokenValue, punchType, punchSource) {
+async function executePunch(tokenValue, punchType = 'AUTO', punchSource = 'MOBILE_CAM_SCAN') {
   const resultBox = document.getElementById('remote-result-box');
 
   try {
+    showToast('Procesando código escaneado...', 'info');
+
     const payload = {
       token: tokenValue,
       punch_type: punchType,
       punch_source: punchSource,
       latitude: userCoords ? userCoords.lat : null,
       longitude: userCoords ? userCoords.lng : null,
-      device_info: `Mobile App (${navigator.platform}) - GPS: ${userCoords ? 'ACTIVO' : 'NO'}`
+      device_info: `Supervisor Móvil (${navigator.platform}) - GPS: ${userCoords ? 'ACTIVO' : 'NO'}`
     };
 
     const response = await api.attendance.punch(payload);
 
     if (response && response.success) {
       if (resultBox) {
-        document.getElementById('remote-res-title').textContent = '¡Marcación Confirmada!';
+        document.getElementById('remote-res-title').textContent = response.message;
         document.getElementById('remote-res-name').textContent = `${response.data.employee.name} (${response.data.employee.position})`;
         
-        let msg = `${response.message} • Hora: ${new Date(response.data.punch.time).toLocaleTimeString('es-PE')}`;
-        if (userCoords) {
-          msg += ` • GPS: ${userCoords.lat.toFixed(4)}, ${userCoords.lng.toFixed(4)}`;
+        let msg = `🏢 Sede: ${response.data.employee.branch_name} • Hora: ${new Date(response.data.punch.time).toLocaleTimeString('es-PE')}`;
+        let geoMsg = userCoords ? `🛰️ GPS: ${userCoords.lat.toFixed(4)}, ${userCoords.lng.toFixed(4)}` : '⚠️ Sin coordenadas';
+        if (response.data.punch.distance_meters !== null) {
+          geoMsg += ` • Distancia a sede: ${response.data.punch.distance_meters}m`;
         }
+
         document.getElementById('remote-res-msg').textContent = msg;
+        document.getElementById('remote-res-geo').textContent = geoMsg;
 
         resultBox.classList.remove('hidden');
         resultBox.scrollIntoView({ behavior: 'smooth' });
       }
 
+      showToast(`¡${response.data.employee.name} registrado!`, 'success');
       await loadMobileTodayLogs();
     } else {
       alert(response.message || 'Error al procesar la marcación.');
     }
   } catch (error) {
-    alert(error.message || 'Credencial o DNI no encontrado.');
+    alert(error.message || 'Código o credencial no encontrado en el sistema.');
   }
 }
 
@@ -214,8 +155,8 @@ window.loadMobileTodayLogs = async function() {
       container.innerHTML = res.data.map(log => {
         const timeStr = new Date(log.punch_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
         const typeBadge = log.punch_type === 'ENTRY' 
-          ? '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ENTRADA</span>'
-          : '<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20">SALIDA</span>';
+          ? '<span class="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ENTRADA</span>'
+          : '<span class="px-2 py-0.5 rounded text-[9px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/20">SALIDA</span>';
 
         return `
           <div class="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-2">
@@ -263,19 +204,21 @@ window.toggleMobileCamera = async function() {
     try {
       mobileQrScanner = new Html5Qrcode('mobile-reader');
       const config = {
-        fps: 20,
-        qrbox: { width: 220, height: 220 },
+        fps: 24,
+        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.3333
       };
 
       await mobileQrScanner.start(
-        { facingMode: 'environment' }, // Cámara trasera del celular
+        { facingMode: 'environment' }, // Cámara trasera
         config,
         async (decodedText) => {
-          if (decodedText) {
+          if (decodedText && !isScanningCooldown) {
+            isScanningCooldown = true;
             await executePunch(decodedText, 'AUTO', 'MOBILE_CAM_SCAN');
-            // Pausa breve tras escaneo
-            setTimeout(() => {}, 1500);
+            setTimeout(() => {
+              isScanningCooldown = false;
+            }, 2500);
           }
         },
         (error) => {}

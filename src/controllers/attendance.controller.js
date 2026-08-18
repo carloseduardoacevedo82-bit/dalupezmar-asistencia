@@ -3,6 +3,98 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { calculateTardiness, calculateWorkedMinutes, calculateOvertime, calculateDistanceMeters } = require('../utils/timeCalculations');
 
 /**
+ * Buscador universal y ultra-flexible de colaboradores para cualquier tipo de token:
+ * Soporta: QR delantero con hash, QR trasero con DNI, Código de barras Code128, DNI numérico, Código DAL-XXXX, URLs o JSON
+ */
+function findEmployeeByAnyToken(rawToken) {
+  if (!rawToken) return null;
+  const clean = String(rawToken).trim();
+
+  const baseSelect = `
+    SELECT 
+      e.id as employee_id,
+      e.employee_code,
+      e.first_name,
+      e.last_name,
+      e.document_number,
+      e.photo_url,
+      e.status as employee_status,
+      e.work_mode,
+      e.branch_id,
+      e.shift_id,
+      d.name as department_name,
+      p.name as position_name,
+      b.name as branch_name,
+      b.latitude as branch_lat,
+      b.longitude as branch_lng,
+      b.radius_meters as branch_radius,
+      s.name as shift_name,
+      s.entry_time as shift_entry_time,
+      s.exit_time as shift_exit_time,
+      s.lunch_start as shift_lunch_start,
+      s.lunch_end as shift_lunch_end,
+      s.tolerance_minutes as shift_tolerance,
+      s.lunch_duration_minutes
+    FROM employees e
+    LEFT JOIN departments d ON e.department_id = d.id
+    LEFT JOIN positions p ON e.position_id = p.id
+    LEFT JOIN branches b ON e.branch_id = b.id
+    LEFT JOIN shifts s ON e.shift_id = s.id
+  `;
+
+  // 1. Búsqueda directa por DNI o Código de Empleado
+  let emp = db.prepare(`${baseSelect} WHERE e.document_number = ? OR e.employee_code = ? OR e.id = ?`).get(clean, clean, Number(clean) || 0);
+  if (emp) return emp;
+
+  // 2. Búsqueda por token QR registrado en tabla badges o código de barras
+  const badge = db.prepare('SELECT employee_id FROM badges WHERE qr_token_hash = ? OR barcode_value = ? OR badge_code = ? ORDER BY id DESC LIMIT 1').get(clean, clean, clean);
+  if (badge) {
+    emp = db.prepare(`${baseSelect} WHERE e.id = ?`).get(badge.employee_id);
+    if (emp) return emp;
+  }
+
+  // 3. Token con prefijo oficial AGY_SEC_QR_DAL-XXXX_DNI
+  if (clean.includes('AGY_SEC_QR_')) {
+    const cleanSub = clean.replace('AGY_SEC_QR_', '');
+    const parts = cleanSub.split('_');
+    for (const p of parts) {
+      if (p) {
+        emp = db.prepare(`${baseSelect} WHERE e.document_number = ? OR e.employee_code = ?`).get(p, p);
+        if (emp) return emp;
+      }
+    }
+  }
+
+  // 4. Búsqueda si contiene secuencia de 8 a 9 dígitos (DNI / Carnet) en cualquier parte del texto
+  const docMatches = clean.match(/\d{8,9}/g);
+  if (docMatches) {
+    for (const doc of docMatches) {
+      emp = db.prepare(`${baseSelect} WHERE e.document_number = ?`).get(doc);
+      if (emp) return emp;
+    }
+  }
+
+  // 5. Búsqueda por código de formato DAL-XXXX o DALXXXX o EMP-XXXX
+  const codeMatch = clean.match(/(DAL|EMP)[-_]?\d{3,5}/i);
+  if (codeMatch) {
+    const rawCode = codeMatch[0].toUpperCase();
+    const formatted = rawCode.includes('-') ? rawCode : rawCode.replace(/(DAL|EMP)/, '$1-');
+    emp = db.prepare(`${baseSelect} WHERE UPPER(e.employee_code) = ? OR UPPER(e.employee_code) = ?`).get(rawCode, formatted);
+    if (emp) return emp;
+  }
+
+  // 6. Búsqueda si contiene parámetro URL (?id= o ?dni=)
+  const urlIdMatch = clean.match(/[?&](?:id|dni|code)=([^&]+)/i);
+  if (urlIdMatch && urlIdMatch[1]) {
+    const val = decodeURIComponent(urlIdMatch[1]).trim();
+    emp = db.prepare(`${baseSelect} WHERE e.document_number = ? OR e.employee_code = ?`).get(val, val);
+    if (emp) return emp;
+  }
+
+  return null;
+}
+
+/**
  * Registro inteligente de marcación de asistencia (Kiosco QR, Lector de Barras o Web Remota)
  */
 const punch = (req, res) => {
@@ -23,82 +115,11 @@ const punch = (req, res) => {
 
     const raw = String(token).trim();
 
-    // Extraer identificadores posibles del token escaneado
-    // Soporta: QR frontal completo (AGY_SEC_QR_DAL-1002_77699820), DNI (77699820), Código (DAL-1002), o URL
-    let extractedDni = raw;
-    let extractedCode = raw;
-
-    if (raw.includes('AGY_SEC_QR_')) {
-      const parts = raw.replace('AGY_SEC_QR_', '').split('_');
-      if (parts.length >= 2) {
-        extractedCode = parts[0];
-        extractedDni = parts[1];
-      } else if (parts.length === 1) {
-        extractedDni = parts[0];
-      }
-    } else if (raw.includes('?id=')) {
-      const idMatch = raw.match(/id=([0-9]+)/);
-      if (idMatch) extractedCode = idMatch[1];
-    } else {
-      // Buscar si contiene secuencia de 8 o 9 dígitos (DNI/CEX)
-      const numMatch = raw.match(/[0-9]{8,9}/);
-      if (numMatch) {
-        extractedDni = numMatch[0];
-      }
-    }
-
-    // 1. Identificar al empleado y su turno activo
-    const empQuery = `
-      SELECT 
-        e.id as employee_id,
-        e.employee_code,
-        e.first_name,
-        e.last_name,
-        e.document_number,
-        e.photo_url,
-        e.status as employee_status,
-        e.work_mode,
-        e.branch_id,
-        e.shift_id,
-        d.name as department_name,
-        p.name as position_name,
-        b.name as branch_name,
-        b.latitude as branch_lat,
-        b.longitude as branch_lng,
-        b.radius_meters as branch_radius,
-        s.name as shift_name,
-        s.entry_time as shift_entry_time,
-        s.exit_time as shift_exit_time,
-        s.lunch_start as shift_lunch_start,
-        s.lunch_end as shift_lunch_end,
-        s.tolerance_minutes as shift_tolerance,
-        s.lunch_duration_minutes
-      FROM employees e
-      LEFT JOIN badges bg ON e.id = bg.employee_id
-      LEFT JOIN departments d ON e.department_id = d.id
-      LEFT JOIN positions p ON e.position_id = p.id
-      LEFT JOIN branches b ON e.branch_id = b.id
-      LEFT JOIN shifts s ON e.shift_id = s.id
-      WHERE (
-        bg.qr_token_hash = ? 
-        OR bg.barcode_value = ? 
-        OR bg.badge_code = ? 
-        OR e.document_number = ? 
-        OR e.document_number = ?
-        OR e.employee_code = ? 
-        OR e.employee_code = ?
-        OR e.id = ?
-        OR ? LIKE '%' || e.document_number || '%'
-      )
-      ORDER BY e.status ASC, bg.id DESC LIMIT 1
-    `;
-
-    const emp = db.prepare(empQuery).get(
-      raw, raw, raw, raw, extractedDni, raw, extractedCode, Number(extractedCode) || 0, raw
-    );
+    // 1. Identificar al colaborador con el buscador universal
+    const emp = findEmployeeByAnyToken(raw);
 
     if (!emp) {
-      return errorResponse(res, `Código no reconocido (${raw}). No se encontró trabajador asociado.`, null, 404);
+      return errorResponse(res, `Código o QR no reconocido (${raw}). No se encontró trabajador asociado en el sistema.`, null, 404);
     }
 
     if (emp.employee_status !== 'ACTIVE') {

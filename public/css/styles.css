@@ -53,10 +53,14 @@ body {
 /* ==========================================================================
    OPTIMIZACIÓN DE ENTORNO ÚNICO Y CELULARES (ELIMINACIÓN DE BARRAS DUPLICADAS)
    ========================================================================== */
+.is-embedded nav,
+.is-embedded header,
 .is-embedded nav.glass-nav,
 .is-embedded header.glass-nav,
 .is-embedded nav.no-print,
-.is-embedded header.no-print {
+.is-embedded header.no-print,
+body.is-embedded nav,
+body.is-embedded header {
   display: none !important;
 }
 
