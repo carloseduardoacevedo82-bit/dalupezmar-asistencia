@@ -70,7 +70,12 @@ const api = {
   // Endpoints específicos
   auth: {
     login: (credentials) => api.request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
-    profile: () => api.request('/auth/profile')
+    workerLogin: (credentials) => api.request('/auth/worker-login', { method: 'POST', body: JSON.stringify(credentials) }),
+    profile: () => api.request('/auth/profile'),
+    register: (userData) => api.request('/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
+    getUsers: () => api.request('/auth/users'),
+    updateUser: (id, data) => api.request(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteUser: (id) => api.request(`/auth/users/${id}`, { method: 'DELETE' })
   },
 
   employees: {

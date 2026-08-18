@@ -32,6 +32,11 @@ if (config.nodeEnv !== 'test') {
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
+// Rutas directas limpias
+app.get(['/trabajador', '/portal-trabajador'], (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/portal-trabajador.html'));
+});
+
 // Rutas de la API REST v1
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/employees', employeeRoutes);

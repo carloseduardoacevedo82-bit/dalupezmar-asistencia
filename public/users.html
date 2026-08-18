@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gestión de Usuarios y Credenciales | DALUPEZMAR</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=3.4">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- CABECERA -->
+  <nav class="glass-nav sticky top-0 z-40 px-6 py-3 flex items-center justify-between no-print border-b border-slate-800">
+    <div class="flex items-center gap-3.5">
+      <img src="/icons/icon-192.png" alt="DALUPEZMAR" class="w-10 h-10 rounded-2xl shadow-lg border border-cyan-400/40 object-cover">
+      <div>
+        <h1 class="text-base font-black tracking-tight text-white flex items-center gap-2">
+          Usuarios & Credenciales <span class="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">SEGURIDAD</span>
+        </h1>
+        <p class="text-[11px] text-slate-400 font-semibold">Administradores, Supervisores de Campo y Accesos</p>
+      </div>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 p-2.5 sm:p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- TARJETA SUPERIOR Y ACCIONES -->
+    <div class="glass-panel p-6 rounded-3xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+      <div>
+        <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+          <i data-lucide="key-round" class="w-5 h-5 text-cyan-400"></i> Cuentas y Contraseñas del Sistema
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">
+          Otorga y modifica credenciales para Administradores y Supervisores de Campo con roles y accesos seguros.
+        </p>
+      </div>
+      <button onclick="openCreateUserModal()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-xs shadow-lg shadow-cyan-500/25 flex items-center gap-2 cursor-pointer transition active:scale-95">
+        <i data-lucide="user-plus" class="w-4 h-4"></i> Crear Nuevo Usuario
+      </button>
+    </div>
+
+    <!-- TABLA DE USUARIOS DEL SISTEMA -->
+    <div class="glass-panel rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-800/80 flex items-center justify-between">
+        <h3 class="text-xs font-black uppercase tracking-wider text-slate-300">Lista de Cuentas Administrativas y Supervisores</h3>
+        <button onclick="loadUsersList()" class="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white border border-slate-800 transition">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-900/60 text-slate-400 font-extrabold text-[11px] uppercase tracking-wider border-b border-slate-800">
+              <th class="py-3 px-4">Usuario / Email</th>
+              <th class="py-3 px-4">Nombre Completo</th>
+              <th class="py-3 px-4">Rol en el Sistema</th>
+              <th class="py-3 px-4">Último Ingreso</th>
+              <th class="py-3 px-4">Estado</th>
+              <th class="py-3 px-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body" class="divide-y divide-slate-800/60 text-xs">
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-500">Cargando lista de usuarios...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL CREAR USUARIO -->
+  <div id="modal-create-user" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-4 h-4 text-cyan-400"></i> Registrar Nuevo Usuario
+        </h3>
+        <button onclick="closeCreateUserModal()" class="p-1 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-create-user" class="space-y-3.5">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Nombre Completo *</label>
+          <input type="text" id="new-user-fullname" required placeholder="Ej: Ing. Marco Morales" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Usuario de Acceso *</label>
+            <input type="text" id="new-user-username" required placeholder="Ej: supervisor.campo" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono font-bold">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Rol Asignado *</label>
+            <select id="new-user-role" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-cyan-300 font-bold">
+              <option value="SUPERVISOR">🛡️ Supervisor de Campo</option>
+              <option value="ADMIN">👑 Administrador Total</option>
+              <option value="HR">📋 Recursos Humanos</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Correo Electrónico (Opcional)</label>
+          <input type="email" id="new-user-email" placeholder="usuario@dalupezmar.com" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white">
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Contraseña Inicial *</label>
+          <input type="password" id="new-user-password" required minlength="4" placeholder="Mínimo 4 caracteres" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono font-bold">
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeCreateUserModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs">Cancelar</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25">Guardar Usuario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CAMBIAR CONTRASEÑA / EDITAR -->
+  <div id="modal-edit-user" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-slate-700 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="key" class="w-4 h-4 text-amber-400"></i> Modificar Credenciales y Contraseña
+        </h3>
+        <button onclick="closeEditUserModal()" class="p-1 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-edit-user" class="space-y-3.5">
+        <input type="hidden" id="edit-user-id">
+
+        <div>
+          <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Nombre Completo</label>
+          <input type="text" id="edit-user-fullname" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Rol</label>
+            <select id="edit-user-role" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-cyan-300 font-bold">
+              <option value="ADMIN">👑 Administrador</option>
+              <option value="SUPERVISOR">🛡️ Supervisor Campo</option>
+              <option value="HR">📋 Recursos Humanos</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Estado</label>
+            <select id="edit-user-active" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-emerald-300 font-bold">
+              <option value="1">🟢 Activo</option>
+              <option value="0">🔴 Inactivo / Bloqueado</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-amber-300 uppercase mb-1">Nueva Contraseña (Dejar vacío para no cambiar)</label>
+          <input type="password" id="edit-user-password" placeholder="Escribe nueva contraseña" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono font-bold focus:border-amber-400">
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeEditUserModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs">Cancelar</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25">Actualizar Credenciales</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=3.4"></script>
+  <script src="/js/auth.js?v=3.4"></script>
+  <script>
+    lucide.createIcons();
+
+    let usersList = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadUsersList();
+    });
+
+    async function loadUsersList() {
+      const tbody = document.getElementById('users-table-body');
+      try {
+        const res = await api.auth.getUsers();
+        if (res && res.data) {
+          usersList = res.data;
+
+          if (usersList.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">No hay usuarios registrados.</td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = usersList.map(u => {
+            const roleBadges = {
+              ADMIN: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/10 text-purple-300 border border-purple-500/30">👑 ADMIN</span>',
+              SUPERVISOR: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">🛡️ SUPERVISOR</span>',
+              HR: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/10 text-cyan-300 border border-cyan-500/30">📋 RRHH</span>'
+            };
+
+            const statusBadge = u.is_active ? 
+              '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-400">Activo</span>' :
+              '<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/10 text-rose-400">Inactivo</span>';
+
+            const lastLoginStr = u.last_login ? new Date(u.last_login).toLocaleString('es-PE') : 'Nunca';
+
+            return `
+              <tr class="hover:bg-slate-900/50 transition">
+                <td class="py-3 px-4 font-mono font-bold text-white">
+                  ${u.username}
+                  ${u.email ? `<p class="text-[10px] text-slate-400 font-sans font-normal">${u.email}</p>` : ''}
+                </td>
+                <td class="py-3 px-4 font-bold text-slate-200">${u.full_name}</td>
+                <td class="py-3 px-4">${roleBadges[u.role] || u.role}</td>
+                <td class="py-3 px-4 text-slate-400 font-mono text-[11px]">${lastLoginStr}</td>
+                <td class="py-3 px-4">${statusBadge}</td>
+                <td class="py-3 px-4 text-right space-x-1">
+                  <button onclick="openEditUserModal(${u.id})" class="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400 border border-slate-700 transition" title="Cambiar Contraseña / Editar">
+                    <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button onclick="deleteUserAccount(${u.id})" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-slate-700 transition" title="Eliminar Usuario">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+
+          lucide.createIcons();
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-rose-400">Error al cargar usuarios: ${err.message}</td></tr>`;
+      }
+    }
+
+    function openCreateUserModal() {
+      document.getElementById('form-create-user').reset();
+      document.getElementById('modal-create-user').classList.remove('hidden');
+    }
+
+    function closeCreateUserModal() {
+      document.getElementById('modal-create-user').classList.add('hidden');
+    }
+
+    document.getElementById('form-create-user')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const full_name = document.getElementById('new-user-fullname').value.trim();
+      const username = document.getElementById('new-user-username').value.trim();
+      const role = document.getElementById('new-user-role').value;
+      const email = document.getElementById('new-user-email').value.trim();
+      const password = document.getElementById('new-user-password').value.trim();
+
+      try {
+        showToast('Registrando usuario...', 'info');
+        const res = await api.auth.register({ full_name, username, role, email, password });
+        if (res && res.success) {
+          showToast('¡Usuario creado exitosamente!', 'success');
+          closeCreateUserModal();
+          await loadUsersList();
+        } else {
+          alert(res.message || 'Error al registrar.');
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+
+    function openEditUserModal(id) {
+      const u = usersList.find(x => x.id === id);
+      if (!u) return;
+
+      document.getElementById('edit-user-id').value = u.id;
+      document.getElementById('edit-user-fullname').value = u.full_name;
+      document.getElementById('edit-user-role').value = u.role;
+      document.getElementById('edit-user-active').value = u.is_active ? '1' : '0';
+      document.getElementById('edit-user-password').value = '';
+
+      document.getElementById('modal-edit-user').classList.remove('hidden');
+    }
+
+    function closeEditUserModal() {
+      document.getElementById('modal-edit-user').classList.add('hidden');
+    }
+
+    document.getElementById('form-edit-user')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('edit-user-id').value;
+      const full_name = document.getElementById('edit-user-fullname').value.trim();
+      const role = document.getElementById('edit-user-role').value;
+      const is_active = Number(document.getElementById('edit-user-active').value);
+      const password = document.getElementById('edit-user-password').value.trim();
+
+      try {
+        showToast('Actualizando credenciales...', 'info');
+        const payload = { full_name, role, is_active };
+        if (password) payload.password = password;
+
+        await api.auth.updateUser(id, payload);
+        showToast('Credenciales actualizadas con éxito.', 'success');
+        closeEditUserModal();
+        await loadUsersList();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+
+    async function deleteUserAccount(id) {
+      if (!confirm('¿Estás seguro de que deseas eliminar esta cuenta de usuario?')) return;
+      try {
+        await api.auth.deleteUser(id);
+        showToast('Usuario eliminado.', 'success');
+        await loadUsersList();
+      } catch (err) {
+        alert('Error al eliminar: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

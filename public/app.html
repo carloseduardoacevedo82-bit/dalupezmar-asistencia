@@ -19,7 +19,7 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=3.3">
+  <link rel="stylesheet" href="/css/styles.css?v=3.5">
 
   <style>
     /* Estructura del marco unificado con sidebar lateral colapsable */
@@ -38,7 +38,7 @@
 
     /* Sidebar lateral transitions */
     #app-sidebar {
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     .sidebar-collapsed {
@@ -50,12 +50,13 @@
     
     @media (min-width: 769px) {
       .sidebar-collapsed {
-        width: 72px !important;
+        width: 68px !important;
         transform: translateX(0) !important;
       }
       .sidebar-collapsed .sidebar-label,
       .sidebar-collapsed .sidebar-badge,
-      .sidebar-collapsed .sidebar-header-text {
+      .sidebar-collapsed .sidebar-header-text,
+      .sidebar-collapsed .sidebar-role-box {
         display: none !important;
       }
     }
@@ -88,54 +89,44 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-hidden select-none">
 
-  <!-- CABECERA SUPERIOR UNIVERSAL (56px) -->
+  <!-- CABECERA SUPERIOR UNIVERSAL ULTRA-COMPACTA (56px) - SIN OVERFLOW -->
   <header class="h-14 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 px-3 md:px-5 flex items-center justify-between z-40 relative shadow-md">
     
-    <!-- LADO IZQUIERDO: BOTÓN HAMBURGUESA SIDEBAR + LOGO DALUPEZMAR -->
-    <div class="flex items-center gap-2.5">
+    <!-- LADO IZQUIERDO: BOTÓN HAMBURGUESA + LOGO DALUPEZMAR -->
+    <div class="flex items-center gap-2">
       <!-- Botón Ver / Ocultar Menú Lateral -->
-      <button onclick="toggleSidebar()" id="btn-toggle-sidebar" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 shadow-sm transition flex items-center justify-center cursor-pointer" title="Ver / Ocultar Menú Lateral (☰)">
+      <button onclick="toggleSidebar()" id="btn-toggle-sidebar" class="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-sm transition flex items-center justify-center cursor-pointer shrink-0" title="Ver / Ocultar Menú Lateral (☰)">
         <i data-lucide="menu" class="w-5 h-5"></i>
       </button>
 
       <!-- Logo Oficial y Nombre DALUPEZMAR -->
-      <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchTab('dashboard')">
-        <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-9 h-9 rounded-xl shadow-md border border-cyan-400/40 object-cover">
-        <div class="flex flex-col">
-          <div class="flex items-center gap-1.5">
-            <span class="text-sm md:text-base font-black tracking-tight text-white leading-none">DALUPEZMAR</span>
-            <span class="px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black bg-blue-500/20 text-cyan-300 border border-cyan-500/30">OFICIAL</span>
+      <div class="flex items-center gap-2 cursor-pointer truncate" onclick="switchTab('dashboard')">
+        <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-8 h-8 rounded-xl shadow-md border border-cyan-400/40 object-cover shrink-0">
+        <div class="flex flex-col truncate">
+          <div class="flex items-center gap-1">
+            <span class="text-sm font-black tracking-tight text-white leading-none truncate">DALUPEZMAR</span>
           </div>
-          <span id="current-view-title" class="text-[10px] text-slate-400 font-semibold hidden sm:inline leading-tight mt-0.5">Panel de Control</span>
+          <span id="current-view-title" class="text-[10px] text-cyan-400 font-bold truncate leading-tight mt-0.5">Panel de Control</span>
         </div>
       </div>
     </div>
 
-    <!-- LADO DERECHO: SELECTOR DE ROL, INSTALAR, TEMA Y CERRAR SESIÓN -->
-    <div class="flex items-center gap-1.5 md:gap-2">
-      
-      <!-- SELECTOR RÁPIDO DE MODO (ADMIN / SUPERVISOR / TRABAJADOR) -->
-      <div class="relative">
-        <select id="select-active-role" onchange="handleRoleSwitch(this.value)" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 font-extrabold text-[11px] md:text-xs py-1.5 px-2.5 rounded-xl border border-cyan-500/30 focus:outline-none cursor-pointer">
-          <option value="ADMIN">👑 Administrador</option>
-          <option value="SUPERVISOR">🛡️ Supervisor Campo</option>
-          <option value="WORKER">👷 Portal Trabajador</option>
-        </select>
-      </div>
+    <!-- LADO DERECHO: ACCIONES RÁPIDAS (COMPACTAS Y SIN DESBORDE) -->
+    <div class="flex items-center gap-1.5 shrink-0">
+
+      <!-- Botón Modo Claro / Oscuro -->
+      <button onclick="toggleUnifiedTheme()" class="btn-theme-toggle p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/60 transition cursor-pointer" title="Cambiar Modo Claro / Oscuro">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+      </button>
 
       <!-- BOTÓN INSTALAR APP PWA -->
-      <button id="btn-install-pwa" onclick="triggerPwaInstall()" class="px-2.5 md:px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] md:text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
+      <button id="btn-install-pwa" onclick="triggerPwaInstall()" class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md flex items-center gap-1 transition active:scale-95 cursor-pointer" title="Instalar Aplicación">
         <i data-lucide="download" class="w-3.5 h-3.5 stroke-[2.5]"></i>
         <span class="hidden sm:inline">Instalar</span>
       </button>
 
-      <!-- Botón Modo Claro / Oscuro -->
-      <button onclick="toggleUnifiedTheme()" class="btn-theme-toggle p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/50 transition cursor-pointer" title="Cambiar Modo Claro / Oscuro">
-        <i data-lucide="sun" class="w-4 h-4"></i>
-      </button>
-
       <!-- Botón Cerrar Sesión -->
-      <button onclick="handleLogout()" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700/50 transition cursor-pointer" title="Cerrar Sesión">
+      <button onclick="handleLogout()" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700/60 transition cursor-pointer" title="Cerrar Sesión">
         <i data-lucide="log-out" class="w-4 h-4"></i>
       </button>
 
@@ -146,15 +137,15 @@
   <div class="flex-1 flex overflow-hidden relative">
 
     <!-- TELÓN DE FONDO PARA MÓVILES (BACKDROP SIDEBAR) -->
-    <div id="sidebar-backdrop" onclick="toggleSidebar(false)" class="fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-sm hidden md:hidden"></div>
+    <div id="sidebar-backdrop" onclick="toggleSidebar(false)" class="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm hidden md:hidden"></div>
 
     <!-- SIDEBAR LATERAL DESPLEGABLE / COLAPSABLE (PC, TABLETS Y CELULARES) -->
-    <aside id="app-sidebar" class="fixed md:static inset-y-0 left-0 z-30 w-64 bg-slate-900/98 backdrop-blur-2xl border-r border-slate-800 p-3.5 flex flex-col justify-between overflow-y-auto shrink-0 shadow-2xl md:shadow-none">
+    <aside id="app-sidebar" class="fixed md:static inset-y-0 left-0 z-30 w-64 bg-slate-900/98 backdrop-blur-2xl border-r border-slate-800 p-3 flex flex-col justify-between overflow-y-auto shrink-0 shadow-2xl md:shadow-none">
       
       <!-- PARTE SUPERIOR DEL SIDEBAR -->
-      <div class="space-y-4">
+      <div class="space-y-3">
         
-        <!-- Cabecera del Sidebar con botón de cerrar en móviles -->
+        <!-- Cabecera del Sidebar con selector de modo y botón de cerrar -->
         <div class="flex items-center justify-between px-1 pb-2 border-b border-slate-800/80">
           <div class="flex items-center gap-2">
             <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
@@ -165,17 +156,27 @@
           </button>
         </div>
 
+        <!-- MODO SELECCIONADO (ADMIN / SUPERVISOR / TRABAJADOR) -->
+        <div class="sidebar-role-box p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+          <p class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Modo Activo:</p>
+          <select id="select-active-role" onchange="handleRoleSwitch(this.value)" class="w-full bg-slate-800 text-cyan-300 font-extrabold text-xs py-1.5 px-2 rounded-xl border border-cyan-500/30 focus:outline-none cursor-pointer">
+            <option value="ADMIN">👑 Modo Administrador</option>
+            <option value="SUPERVISOR">🛡️ Modo Supervisor Campo</option>
+            <option value="WORKER">👷 Portal del Trabajador</option>
+          </select>
+        </div>
+
         <!-- LISTA DE MENÚS DEL SISTEMA -->
-        <nav class="space-y-1.5" id="sidebar-nav-links">
+        <nav class="space-y-1" id="sidebar-nav-links">
           
           <!-- 1. Panel de Control -->
-          <button onclick="switchTab('dashboard')" id="side-dashboard" class="sidebar-tab active-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold flex items-center gap-3 transition cursor-pointer">
+          <button onclick="switchTab('dashboard')" id="side-dashboard" class="sidebar-tab active-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-3 transition cursor-pointer">
             <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
             <span class="sidebar-label">Panel General</span>
           </button>
 
           <!-- 2. Personal (87) -->
-          <button onclick="switchTab('employees')" id="side-employees" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
+          <button onclick="switchTab('employees')" id="side-employees" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
             <div class="flex items-center gap-3">
               <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
               <span class="sidebar-label">Personal</span>
@@ -184,13 +185,13 @@
           </button>
 
           <!-- 3. Diseñador de Fotochecks -->
-          <button onclick="switchTab('badges')" id="side-badges" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <button onclick="switchTab('badges')" id="side-badges" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="id-card" class="w-4 h-4 shrink-0"></i>
             <span class="sidebar-label">Diseñador Fotochecks</span>
           </button>
 
           <!-- 4. Tareo, Modificación & Planillas -->
-          <button onclick="switchTab('reports')" id="side-reports" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
+          <button onclick="switchTab('reports')" id="side-reports" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center justify-between cursor-pointer">
             <div class="flex items-center gap-3">
               <i data-lucide="file-spreadsheet" class="w-4 h-4 shrink-0"></i>
               <span class="sidebar-label">Tareo & Planillas</span>
@@ -199,41 +200,50 @@
           </button>
 
           <!-- 5. Sedes & Geocercas GPS -->
-          <button onclick="switchTab('branches')" id="side-branches" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <button onclick="switchTab('branches')" id="side-branches" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-cyan-400"></i>
             <span class="sidebar-label">Sedes & Geocercas GPS</span>
           </button>
 
+          <!-- 6. Gestión de Usuarios & Contraseñas -->
+          <button onclick="switchTab('users')" id="side-users" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+            <i data-lucide="key" class="w-4 h-4 shrink-0 text-amber-400"></i>
+            <span class="sidebar-label">Usuarios & Credenciales</span>
+          </button>
+
           <!-- Separador -->
-          <div class="pt-2 pb-1">
+          <div class="pt-2 pb-0.5">
             <p class="text-[9px] font-black uppercase text-slate-500 px-3 sidebar-header-text">Marcaciones y Campo</p>
           </div>
 
-          <!-- 6. Kiosco Escáner QR -->
-          <button onclick="switchTab('kiosk')" id="side-kiosk" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <!-- 7. Kiosco Escáner QR -->
+          <button onclick="switchTab('kiosk')" id="side-kiosk" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="scan" class="w-4 h-4 shrink-0 text-cyan-400"></i>
             <span class="sidebar-label">Kiosco Escáner QR</span>
           </button>
 
-          <!-- 7. Supervisión Móvil de Campo -->
-          <button onclick="switchTab('remote')" id="side-remote" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
+          <!-- 8. Supervisión Móvil de Campo -->
+          <button onclick="switchTab('remote')" id="side-remote" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
             <i data-lucide="shield-check" class="w-4 h-4 shrink-0 text-emerald-400"></i>
             <span class="sidebar-label">Supervisor de Campo</span>
           </button>
 
-          <!-- 8. Portal del Trabajador (Selfie + GPS) -->
-          <button onclick="switchTab('worker')" id="side-worker" class="sidebar-tab w-full px-3 py-2.5 rounded-2xl text-xs font-extrabold text-slate-300 hover:text-white hover:bg-slate-800/60 transition flex items-center gap-3 cursor-pointer">
-            <i data-lucide="camera" class="w-4 h-4 shrink-0 text-amber-400"></i>
-            <span class="sidebar-label">Marcación Selfie & GPS</span>
-          </button>
+          <!-- 9. Portal del Trabajador (Independiente) -->
+          <a href="/portal-trabajador.html" target="_blank" class="sidebar-tab w-full px-3 py-2 rounded-2xl text-xs font-extrabold text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 transition flex items-center justify-between cursor-pointer border border-amber-500/20">
+            <div class="flex items-center gap-3">
+              <i data-lucide="external-link" class="w-4 h-4 shrink-0 text-amber-400"></i>
+              <span class="sidebar-label">Portal Trabajador (URL)</span>
+            </div>
+            <span class="sidebar-badge text-[8px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-black">NUEVO</span>
+          </a>
 
         </nav>
       </div>
 
       <!-- PIE DEL SIDEBAR -->
-      <div class="pt-4 border-t border-slate-800/80 space-y-2">
-        <div class="p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 sidebar-header-text">
-          <div class="w-8 h-8 rounded-xl bg-blue-600/20 text-cyan-400 flex items-center justify-center font-black text-xs border border-cyan-500/30">
+      <div class="pt-3 border-t border-slate-800/80 space-y-1.5">
+        <div class="p-2 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 sidebar-header-text">
+          <div class="w-7 h-7 rounded-xl bg-blue-600/20 text-cyan-400 flex items-center justify-center font-black text-xs border border-cyan-500/30 shrink-0">
             D
           </div>
           <div class="overflow-hidden">
@@ -275,35 +285,16 @@
       <span class="text-[9px] font-bold mt-0.5">Supervisor</span>
     </button>
 
-    <button onclick="switchTab('worker')" id="mob-worker" class="mob-tab flex flex-col items-center justify-center py-1 text-slate-400 hover:text-amber-300 transition cursor-pointer">
+    <button onclick="window.open('/portal-trabajador.html', '_blank')" id="mob-worker" class="mob-tab flex flex-col items-center justify-center py-1 text-amber-400 hover:text-amber-300 transition cursor-pointer">
       <i data-lucide="camera" class="w-4 h-4 text-amber-400"></i>
-      <span class="text-[9px] font-bold mt-0.5">Selfie GPS</span>
+      <span class="text-[9px] font-bold mt-0.5">Trabajador</span>
     </button>
 
   </nav>
 
-  <!-- BANNER FLOTANTE PWA -->
-  <div id="pwa-install-banner" class="fixed bottom-16 left-3 right-3 max-w-md mx-auto z-50 glass-panel p-3.5 rounded-2xl border border-amber-500/40 bg-slate-900/98 shadow-2xl flex items-center justify-between gap-3 hidden animate-bounce-short">
-    <div class="flex items-center gap-3">
-      <img src="/icons/icon-192.png" class="w-10 h-10 rounded-xl shadow-md border border-amber-500/40 object-cover">
-      <div>
-        <p class="text-xs font-black text-white">Instalar DALUPEZMAR</p>
-        <p class="text-[10px] text-amber-300 font-semibold">Acceso rápido sin navegador en tu dispositivo</p>
-      </div>
-    </div>
-    <div class="flex items-center gap-1.5">
-      <button onclick="dismissInstallBanner()" class="p-1.5 text-slate-400 hover:text-white">
-        <i data-lucide="x" class="w-4 h-4"></i>
-      </button>
-      <button onclick="triggerPwaInstall()" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md">
-        Instalar
-      </button>
-    </div>
-  </div>
-
   <!-- Scripts -->
-  <script src="/js/api.js?v=3.3"></script>
-  <script src="/js/auth.js?v=3.3"></script>
+  <script src="/js/api.js?v=3.5"></script>
+  <script src="/js/auth.js?v=3.5"></script>
   <script>
     lucide.createIcons();
 
@@ -313,9 +304,9 @@
       badges: '/badge-designer.html',
       reports: '/reports.html',
       branches: '/branches.html',
+      users: '/users.html',
       kiosk: '/kiosk.html',
-      remote: '/remote-attendance.html',
-      worker: '/worker-punch.html'
+      remote: '/remote-attendance.html'
     };
 
     const MODULE_TITLES = {
@@ -324,9 +315,9 @@
       badges: 'Diseñador de Fotochecks',
       reports: 'Tareo & Planillas (Excel)',
       branches: 'Sedes & Geocercas GPS',
+      users: 'Usuarios & Credenciales',
       kiosk: 'Kiosco Escáner QR',
-      remote: 'Supervisor Móvil de Campo',
-      worker: 'Portal del Trabajador (Selfie & GPS)'
+      remote: 'Supervisor Móvil de Campo'
     };
 
     let isSidebarOpen = window.innerWidth >= 769;
@@ -414,7 +405,7 @@
       } else if (role === 'SUPERVISOR') {
         switchTab('remote');
       } else if (role === 'WORKER') {
-        switchTab('worker');
+        window.open('/portal-trabajador.html', '_blank');
       }
     }
 
@@ -425,9 +416,27 @@
 
     function syncThemeWithFrame() {
       const frame = document.getElementById('main-app-frame');
-      if (frame && frame.contentWindow && frame.contentWindow.applyAppTheme) {
+      if (frame && frame.contentDocument) {
         const theme = getSavedTheme();
-        frame.contentWindow.applyAppTheme(theme);
+        const isLight = theme === 'light';
+        const doc = frame.contentDocument.documentElement;
+        const body = frame.contentDocument.body;
+
+        if (isLight) {
+          doc.classList.add('light-mode');
+          doc.classList.remove('dark', 'dark-mode');
+          if (body) {
+            body.classList.add('light-mode');
+            body.classList.remove('dark', 'dark-mode');
+          }
+        } else {
+          doc.classList.add('dark', 'dark-mode');
+          doc.classList.remove('light-mode');
+          if (body) {
+            body.classList.add('dark', 'dark-mode');
+            body.classList.remove('light-mode');
+          }
+        }
       }
     }
 
@@ -448,25 +457,15 @@
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const banner = document.getElementById('pwa-install-banner');
-      if (banner && !sessionStorage.getItem('pwa_dismissed')) {
-        banner.classList.remove('hidden');
-      }
     });
 
     function triggerPwaInstall() {
       if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt = null;
-        document.getElementById('pwa-install-banner')?.classList.add('hidden');
       } else {
         alert('Para instalar DALUPEZMAR:\nEn tu navegador Chrome o Edge, toca los 3 puntos ⋮ y presiona "Instalar aplicación" o "Añadir a pantalla principal".');
       }
-    }
-
-    function dismissInstallBanner() {
-      document.getElementById('pwa-install-banner')?.classList.add('hidden');
-      sessionStorage.setItem('pwa_dismissed', 'true');
     }
   </script>
 </body>

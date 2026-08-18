@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Portal del Trabajador | DALUPEZMAR</title>
+  
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#002855">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/styles.css?v=3.4">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-3 sm:p-5 select-none">
+
+  <!-- CABECERA PRINCIPAL DEL PORTAL -->
+  <header class="max-w-lg mx-auto w-full glass-panel p-4 rounded-3xl border border-slate-800 flex items-center justify-between shadow-xl">
+    <div class="flex items-center gap-3">
+      <img src="/icons/icon-192.png" alt="DALUPEZMAR Logo" class="w-11 h-11 rounded-2xl shadow-lg border border-cyan-400/40 object-cover">
+      <div>
+        <h1 class="text-base font-black text-white leading-tight">DALUPEZMAR</h1>
+        <p class="text-[11px] text-cyan-400 font-bold uppercase tracking-wider">Portal del Colaborador</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <button onclick="toggleWorkerPortalTheme()" class="btn-theme-toggle p-2 rounded-xl bg-slate-900 border border-slate-800 text-amber-300 transition" title="Modo Claro / Oscuro">
+        <i data-lucide="sun" class="w-4 h-4"></i>
+      </button>
+      <button id="btn-worker-logout" onclick="handleWorkerLogout()" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-rose-400 hover:bg-rose-500/20 transition hidden" title="Cerrar Sesión">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- SECCIÓN 1: LOGIN DEL TRABAJADOR (SI NO HA INICIADO SESIÓN) -->
+  <section id="worker-login-view" class="max-w-lg mx-auto w-full my-auto py-4 space-y-4">
+    <div class="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
+      
+      <div class="text-center space-y-1">
+        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto mb-2">
+          <i data-lucide="user-check" class="w-7 h-7"></i>
+        </div>
+        <h2 class="text-xl font-black text-white">Ingreso de Colaboradores</h2>
+        <p class="text-xs text-slate-400 font-medium">Acceso para marcación selfie, GPS y consulta de asistencia</p>
+      </div>
+
+      <form id="form-worker-login" class="space-y-4">
+        <div>
+          <label class="block text-xs font-black text-slate-300 uppercase mb-1">DNI o Carnet de Extranjería *</label>
+          <div class="relative">
+            <i data-lucide="credit-card" class="w-4 h-4 absolute left-3.5 top-3.5 text-cyan-400"></i>
+            <input type="text" id="worker-login-doc" required placeholder="Ingresa tu N° de Documento" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono font-bold focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-black text-slate-300 uppercase mb-1">Contraseña *</label>
+          <div class="relative">
+            <i data-lucide="lock" class="w-4 h-4 absolute left-3.5 top-3.5 text-cyan-400"></i>
+            <input type="password" id="worker-login-pass" required placeholder="Por defecto tu mismo N° de DNI" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-cyan-500">
+          </div>
+          <p class="text-[10px] text-cyan-400 font-medium mt-1">🔑 Tu contraseña inicial es tu número de DNI o Carnet.</p>
+        </div>
+
+        <button type="submit" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-sm shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+          <i data-lucide="log-in" class="w-4 h-4"></i> Ingresar al Portal
+        </button>
+      </form>
+
+      <div class="pt-2 border-t border-slate-800 text-center">
+        <a href="/index.html" class="text-xs text-slate-400 hover:text-cyan-300 font-bold flex items-center justify-center gap-1">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i> Acceso para Administradores y Supervisores
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- SECCIÓN 2: PORTAL ACTIVO DEL TRABAJADOR (CUANDO YA INICIÓ SESIÓN) -->
+  <section id="worker-dashboard-view" class="max-w-lg mx-auto w-full my-auto py-2 space-y-4 hidden">
+
+    <!-- PERFIL DEL COLABORADOR Y SEDE ASIGNADA -->
+    <div class="glass-panel p-4 rounded-3xl border border-slate-800 shadow-xl flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <img id="worker-profile-photo" src="/icons/icon-192.png" class="w-13 h-13 rounded-2xl border-2 border-cyan-400/50 object-cover shadow-md" alt="Foto">
+        <div>
+          <h3 id="worker-profile-name" class="text-sm font-black text-white leading-snug">Cargando Colaborador...</h3>
+          <p id="worker-profile-pos" class="text-xs text-cyan-400 font-bold leading-none mt-0.5">Operario de Producción</p>
+          <p id="worker-profile-branch" class="text-[10px] text-slate-400 font-mono mt-1">🏢 Sede Asignada: Planta PECEPE S.A.C.</p>
+        </div>
+      </div>
+      <span class="px-2.5 py-1 rounded-full text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shrink-0">
+        ACTIVO
+      </span>
+    </div>
+
+    <!-- TARJETA GPS SATELITAL EN TIEMPO REAL -->
+    <div class="glass-panel p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-md">
+      <div class="flex items-center gap-3">
+        <div id="w-gps-indicator" class="w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse"></div>
+        <div>
+          <p id="w-gps-title" class="text-xs font-black text-white">Verificando GPS Satelital...</p>
+          <p id="w-gps-coords" class="text-[10px] text-slate-400 font-mono">Calculando cercanía a tu sede...</p>
+        </div>
+      </div>
+      <button onclick="requestWorkerGps()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition" title="Refrescar GPS">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- PANEL PRINCIPAL DE MARCACIÓN CON FOTO SELFIE -->
+    <div class="glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-4">
+      
+      <!-- Reloj Digital -->
+      <div class="text-center space-y-0.5">
+        <div id="w-clock" class="text-3xl font-black font-mono text-cyan-300 drop-shadow-md">--:--:--</div>
+        <p id="w-date" class="text-xs text-slate-400 font-bold uppercase">Cargando fecha...</p>
+      </div>
+
+      <!-- VISOR DE CÁMARA FRONTAL / SELFIE -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-black text-slate-300 uppercase tracking-wider">Foto Selfie de Marcación *</label>
+          <button type="button" onclick="toggleWorkerCamera()" id="btn-w-camera" class="px-2.5 py-1 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 cursor-pointer">
+            <i data-lucide="camera" class="w-3.5 h-3.5"></i> <span id="w-camera-btn-text">Activar Cámara</span>
+          </button>
+        </div>
+
+        <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center">
+          <video id="w-video" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
+          <canvas id="w-canvas" class="hidden"></canvas>
+          <img id="w-selfie-preview" class="w-full h-full object-cover hidden" alt="Selfie">
+
+          <div id="w-selfie-placeholder" class="text-center p-4 space-y-1">
+            <i data-lucide="camera" class="w-10 h-10 text-slate-600 mx-auto"></i>
+            <p class="text-xs text-slate-400 font-semibold">Toca "Activar Cámara" para registrar tu asistencia con foto</p>
+          </div>
+
+          <!-- Botón flotante para capturar snapshot -->
+          <button type="button" id="btn-w-snapshot" onclick="takeWorkerSnapshot()" class="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-xs shadow-xl flex items-center gap-2 hidden cursor-pointer">
+            <i data-lucide="aperture" class="w-4 h-4"></i> Capturar Foto
+          </button>
+        </div>
+      </div>
+
+      <!-- BOTONES DE MARCACIÓN -->
+      <div class="space-y-2 pt-1">
+        <label class="block text-xs font-black text-slate-300 uppercase tracking-wider">Selecciona tu Marcación:</label>
+        
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="submitPortalPunch('ENTRY')" class="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer">
+            <i data-lucide="log-in" class="w-4 h-4"></i> ENTRADA
+          </button>
+          <button type="button" onclick="submitPortalPunch('EXIT')" class="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-red-500 text-white font-black text-xs shadow-lg shadow-rose-500/25 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer">
+            <i data-lucide="log-out" class="w-4 h-4"></i> SALIDA
+          </button>
+          <button type="button" onclick="submitPortalPunch('LUNCH_START')" class="py-2.5 px-3 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer">
+            <i data-lucide="utensils" class="w-3.5 h-3.5 text-amber-400"></i> Inicio Ref.
+          </button>
+          <button type="button" onclick="submitPortalPunch('LUNCH_END')" class="py-2.5 px-3 rounded-xl bg-slate-900 border border-slate-700 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer">
+            <i data-lucide="coffee" class="w-3.5 h-3.5 text-cyan-400"></i> Fin Ref.
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TARJETA DE RESULTADO DE MARCACIÓN -->
+    <div id="w-result-box" class="glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 hidden space-y-3 shadow-2xl">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
+          <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 id="w-res-title" class="text-sm font-black text-white">¡Asistencia Verificada!</h4>
+          <p id="w-res-time" class="text-xs text-emerald-300 font-bold">17/08/2026</p>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 font-mono text-xs">
+        <p id="w-res-msg" class="text-slate-200 font-bold"></p>
+        <p id="w-res-geo" class="text-[11px] text-slate-400"></p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- PIE DE PÁGINA -->
+  <footer class="max-w-lg mx-auto w-full text-center text-[10px] text-slate-500 py-2">
+    DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C. • Portal Oficial del Colaborador
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/js/api.js?v=3.4"></script>
+  <script src="/js/auth.js?v=3.4"></script>
+  <script>
+    lucide.createIcons();
+
+    let currentWorker = null;
+    let workerGps = null;
+    let workerCamStream = null;
+    let capturedSelfieBase64 = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      startWorkerClock();
+      checkWorkerSession();
+    });
+
+    function startWorkerClock() {
+      const clockEl = document.getElementById('w-clock');
+      const dateEl = document.getElementById('w-date');
+
+      function update() {
+        const now = new Date();
+        if (clockEl) clockEl.textContent = now.toLocaleTimeString('es-PE', { hour12: false });
+        if (dateEl) {
+          dateEl.textContent = now.toLocaleDateString('es-PE', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+      }
+      update();
+      setInterval(update, 1000);
+    }
+
+    function checkWorkerSession() {
+      const savedWorker = localStorage.getItem('dalupezmar_worker_user');
+      const token = api.getToken();
+
+      if (savedWorker && token) {
+        try {
+          currentWorker = JSON.parse(savedWorker);
+          renderWorkerDashboard();
+          return;
+        } catch (e) {
+          localStorage.removeItem('dalupezmar_worker_user');
+        }
+      }
+
+      showLoginView();
+    }
+
+    function showLoginView() {
+      document.getElementById('worker-login-view').classList.remove('hidden');
+      document.getElementById('worker-dashboard-view').classList.add('hidden');
+      document.getElementById('btn-worker-logout').classList.add('hidden');
+    }
+
+    function renderWorkerDashboard() {
+      document.getElementById('worker-login-view').classList.add('hidden');
+      document.getElementById('worker-dashboard-view').classList.remove('hidden');
+      document.getElementById('btn-worker-logout').classList.remove('hidden');
+
+      document.getElementById('worker-profile-name').textContent = currentWorker.name;
+      document.getElementById('worker-profile-pos').textContent = currentWorker.position || 'Operario de Producción';
+      document.getElementById('worker-profile-branch').textContent = `🏢 Sede Asignada: ${currentWorker.branch_name || 'Planta Principal PECEPE S.A.C.'}`;
+
+      const photoEl = document.getElementById('worker-profile-photo');
+      if (currentWorker.photo_url) {
+        photoEl.src = currentWorker.photo_url;
+      }
+
+      requestWorkerGps();
+    }
+
+    // Login Form Submit
+    document.getElementById('form-worker-login')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const documentNumber = document.getElementById('worker-login-doc').value.trim();
+      const password = document.getElementById('worker-login-pass').value.trim();
+
+      if (!documentNumber || !password) return;
+
+      try {
+        showToast('Validando acceso...', 'info');
+        const res = await api.auth.workerLogin({ document_number: documentNumber, password });
+
+        if (res && res.success && res.data) {
+          api.setToken(res.data.token);
+          currentWorker = res.data.worker;
+          localStorage.setItem('dalupezmar_worker_user', JSON.stringify(currentWorker));
+
+          showToast(res.message || '¡Bienvenido(a)!', 'success');
+          renderWorkerDashboard();
+        } else {
+          alert(res.message || 'Error en inicio de sesión.');
+        }
+      } catch (err) {
+        alert(err.message || 'Credenciales incorrectas.');
+      }
+    });
+
+    function handleWorkerLogout() {
+      if (confirm('¿Deseas salir del Portal del Trabajador?')) {
+        api.clearSession();
+        localStorage.removeItem('dalupezmar_worker_user');
+        if (workerCamStream) {
+          workerCamStream.getTracks().forEach(t => t.stop());
+        }
+        showLoginView();
+      }
+    }
+
+    function requestWorkerGps() {
+      const indicator = document.getElementById('w-gps-indicator');
+      const title = document.getElementById('w-gps-title');
+      const coordsEl = document.getElementById('w-gps-coords');
+
+      if (!navigator.geolocation) {
+        if (title) title.textContent = 'GPS no soportado';
+        if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-rose-500';
+        return;
+      }
+
+      if (title) title.textContent = 'Obteniendo GPS Satelital...';
+      if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          workerGps = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          };
+
+          if (title) title.textContent = 'GPS Satelital Activo';
+          if (coordsEl) coordsEl.textContent = `Lat: ${workerGps.lat.toFixed(5)}, Lng: ${workerGps.lng.toFixed(5)} (±${Math.round(workerGps.accuracy)}m)`;
+          if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-md shadow-emerald-500/50';
+        },
+        (err) => {
+          console.warn('GPS error:', err);
+          if (title) title.textContent = 'GPS Desactivado o Sin Permiso';
+          if (coordsEl) coordsEl.textContent = 'Por favor, activa la ubicación en tu teléfono';
+          if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-rose-500';
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+
+    async function toggleWorkerCamera() {
+      const video = document.getElementById('w-video');
+      const preview = document.getElementById('w-selfie-preview');
+      const placeholder = document.getElementById('w-selfie-placeholder');
+      const btnSnap = document.getElementById('btn-w-snapshot');
+      const btnText = document.getElementById('w-camera-btn-text');
+
+      if (workerCamStream) {
+        workerCamStream.getTracks().forEach(track => track.stop());
+        workerCamStream = null;
+        video.classList.add('hidden');
+        btnSnap.classList.add('hidden');
+        btnText.textContent = 'Activar Cámara';
+        return;
+      }
+
+      try {
+        workerCamStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+
+        video.srcObject = workerCamStream;
+        video.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        preview.classList.add('hidden');
+        btnSnap.classList.remove('hidden');
+        btnText.textContent = 'Apagar Cámara';
+      } catch (err) {
+        alert('Error al acceder a la cámara frontal: ' + err.message);
+      }
+    }
+
+    function takeWorkerSnapshot() {
+      const video = document.getElementById('w-video');
+      const canvas = document.getElementById('w-canvas');
+      const preview = document.getElementById('w-selfie-preview');
+      const btnSnap = document.getElementById('btn-w-snapshot');
+
+      if (!video || !canvas) return;
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      capturedSelfieBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+      preview.src = capturedSelfieBase64;
+      preview.classList.remove('hidden');
+      video.classList.add('hidden');
+      btnSnap.classList.add('hidden');
+
+      if (workerCamStream) {
+        workerCamStream.getTracks().forEach(track => track.stop());
+        workerCamStream = null;
+      }
+
+      document.getElementById('w-camera-btn-text').textContent = 'Repetir Foto';
+      showToast('¡Foto Selfie capturada!', 'success');
+    }
+
+    async function submitPortalPunch(punchType) {
+      if (!currentWorker) {
+        alert('Sesión no válida. Inicia sesión nuevamente.');
+        showLoginView();
+        return;
+      }
+
+      // Si la cámara estaba prendida y no capturó manual, tomar captura instantánea
+      if (!capturedSelfieBase64 && workerCamStream) {
+        takeWorkerSnapshot();
+      }
+
+      const resultBox = document.getElementById('w-result-box');
+
+      try {
+        showToast('Enviando marcación...', 'info');
+
+        const payload = {
+          token: currentWorker.document_number,
+          punch_type: punchType,
+          punch_source: 'REMOTE_WEB',
+          latitude: workerGps ? workerGps.lat : null,
+          longitude: workerGps ? workerGps.lng : null,
+          photo_selfie: capturedSelfieBase64 || null,
+          device_info: `Portal Trabajador (${navigator.platform})`
+        };
+
+        const response = await api.attendance.punch(payload);
+
+        if (response && response.success) {
+          if (resultBox) {
+            document.getElementById('w-res-title').textContent = response.message;
+            let timeStr = new Date(response.data.punch.time).toLocaleTimeString('es-PE');
+            document.getElementById('w-res-time').textContent = `Hora: ${timeStr} • ${currentWorker.name}`;
+            document.getElementById('w-res-msg').textContent = `🏢 Sitio Asignado: ${response.data.employee.branch_name}`;
+
+            let geoStr = workerGps ? `🛰️ GPS: ${workerGps.lat.toFixed(4)}, ${workerGps.lng.toFixed(4)}` : '⚠️ Sin coordenadas GPS';
+            if (response.data.punch.distance_meters !== null) {
+              geoStr += ` • Distancia a planta: ${response.data.punch.distance_meters}m`;
+            }
+            document.getElementById('w-res-geo').textContent = geoStr;
+
+            resultBox.classList.remove('hidden');
+            resultBox.scrollIntoView({ behavior: 'smooth' });
+          }
+
+          showToast('¡Asistencia registrada con éxito!', 'success');
+        } else {
+          alert(response.message || 'Error al procesar asistencia.');
+        }
+      } catch (error) {
+        alert(error.message || 'Error al registrar marcación.');
+      }
+    }
+
+    function toggleWorkerPortalTheme() {
+      toggleAppTheme();
+    }
+  </script>
+</body>
+</html>

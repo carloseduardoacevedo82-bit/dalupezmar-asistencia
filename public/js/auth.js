@@ -9,23 +9,50 @@ function getSavedTheme() {
 
 function applyAppTheme(theme) {
   const isLight = theme === 'light';
+  const root = document.documentElement;
+  const body = document.body;
+
   if (isLight) {
-    document.documentElement.classList.add('light-mode');
-    document.documentElement.classList.remove('dark-mode');
-    if (document.body) {
-      document.body.classList.add('light-mode');
-      document.body.classList.remove('dark-mode');
+    root.classList.add('light-mode');
+    root.classList.remove('dark', 'dark-mode');
+    if (body) {
+      body.classList.add('light-mode');
+      body.classList.remove('dark', 'dark-mode');
     }
   } else {
-    document.documentElement.classList.add('dark-mode');
-    document.documentElement.classList.remove('light-mode');
-    if (document.body) {
-      document.body.classList.add('dark-mode');
-      document.body.classList.remove('light-mode');
+    root.classList.add('dark', 'dark-mode');
+    root.classList.remove('light-mode');
+    if (body) {
+      body.classList.add('dark', 'dark-mode');
+      body.classList.remove('light-mode');
     }
   }
   localStorage.setItem('app-theme', theme);
   updateThemeButtonsUI(theme);
+
+  // Sincronizar instantáneamente con el iframe interno si existe
+  try {
+    const frame = document.getElementById('main-app-frame');
+    if (frame && frame.contentDocument) {
+      const fRoot = frame.contentDocument.documentElement;
+      const fBody = frame.contentDocument.body;
+      if (isLight) {
+        fRoot.classList.add('light-mode');
+        fRoot.classList.remove('dark', 'dark-mode');
+        if (fBody) {
+          fBody.classList.add('light-mode');
+          fBody.classList.remove('dark', 'dark-mode');
+        }
+      } else {
+        fRoot.classList.add('dark', 'dark-mode');
+        fRoot.classList.remove('light-mode');
+        if (fBody) {
+          fBody.classList.add('dark', 'dark-mode');
+          fBody.classList.remove('light-mode');
+        }
+      }
+    }
+  } catch (e) {}
 }
 
 function toggleAppTheme() {
