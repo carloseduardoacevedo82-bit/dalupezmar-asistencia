@@ -339,8 +339,57 @@
       }
     }
 
+    const SWIPEABLE_TABS = ['dashboard', 'employees', 'badges', 'reports', 'branches', 'users', 'kiosk'];
+    let currentTabIndex = 0;
+
+    function navigateTabOffset(offset) {
+      let nextIndex = currentTabIndex + offset;
+      if (nextIndex < 0) nextIndex = SWIPEABLE_TABS.length - 1;
+      if (nextIndex >= SWIPEABLE_TABS.length) nextIndex = 0;
+      switchTab(SWIPEABLE_TABS[nextIndex]);
+    }
+
+    function attachSwipeListeners(targetDoc) {
+      if (!targetDoc) return;
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+
+      targetDoc.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 1) {
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+          startTime = Date.now();
+        }
+      }, { passive: true });
+
+      targetDoc.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches.length === 1) {
+          const endX = e.changedTouches[0].clientX;
+          const endY = e.changedTouches[0].clientY;
+          const deltaX = endX - startX;
+          const deltaY = endY - startY;
+          const deltaTime = Date.now() - startTime;
+
+          // Deslizamiento horizontal detectado (> 50px de recorrido, más horizontal que vertical, < 600ms)
+          if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4 && deltaTime < 600) {
+            if (deltaX < 0) {
+              // Deslizar a la izquierda 👉 Siguiente Menú
+              navigateTabOffset(1);
+            } else {
+              // Deslizar a la derecha 👈 Menú Anterior
+              navigateTabOffset(-1);
+            }
+          }
+        }
+      }, { passive: true });
+    }
+
     function switchTab(tabKey) {
       if (!MODULE_ROUTES[tabKey]) return;
+
+      const idx = SWIPEABLE_TABS.indexOf(tabKey);
+      if (idx !== -1) currentTabIndex = idx;
 
       const frame = document.getElementById('main-app-frame');
       const titleEl = document.getElementById('current-view-title');
@@ -353,6 +402,11 @@
         frame.onload = () => { 
           frame.style.opacity = '1';
           syncThemeWithFrame();
+          try {
+            if (frame.contentDocument) {
+              attachSwipeListeners(frame.contentDocument);
+            }
+          } catch (e) {}
         };
       }
 
@@ -385,6 +439,9 @@
 
       lucide.createIcons();
     }
+
+    // Activar swipe en el contenedor principal
+    attachSwipeListeners(document);
 
     function handleRoleSwitch(role) {
       if (role === 'ADMIN') {
