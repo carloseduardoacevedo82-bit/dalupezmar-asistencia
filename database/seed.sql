@@ -36,19 +36,11 @@ INSERT OR IGNORE INTO shifts (id, name, code, entry_time, exit_time, lunch_start
 (2, 'Turno Operativo Mañana (07:00 - 16:00)', 'TUR-OP-M', '07:00:00', '16:00:00', '12:00:00', '13:00:00', 10, 60, 0, '1,2,3,4,5,6', 1),
 (3, 'Turno Flexible Remoto (09:00 - 18:00)', 'TUR-REM-F', '09:00:00', '18:00:00', '13:30:00', '14:30:00', 30, 60, 1, '1,2,3,4,5', 1);
 
--- 6. EMPLEADOS DE DEMOSTRACIÓN
-INSERT OR IGNORE INTO employees (id, employee_code, document_type, document_number, first_name, last_name, email, phone, emergency_contact_name, emergency_contact_phone, blood_type, birth_date, hire_date, branch_id, department_id, position_id, shift_id, photo_url, work_mode, status) VALUES 
-(1, 'EMP-1001', 'DNI', '45892147', 'Carlos Alberto', 'Mendoza Quispe', 'carlos.mendoza@globaltech.com', '+51 987654321', 'Elena Quispe (Madre)', '+51 981122334', 'O+', '1992-05-14', '2023-01-15', 1, 1, 1, 1, '/uploads/photos/emp-1001.png', 'HYBRID', 'ACTIVE'),
-(2, 'EMP-1002', 'DNI', '72314569', 'Valeria Sofia', 'Rojas Benítez', 'valeria.rojas@globaltech.com', '+51 976543210', 'Marco Rojas (Padre)', '+51 982233445', 'A+', '1995-09-22', '2023-03-01', 1, 2, 3, 1, '/uploads/photos/emp-1002.png', 'PRESENTIAL', 'ACTIVE'),
-(3, 'EMP-1003', 'DNI', '48123908', 'Diego Alejandro', 'Vargas Salazar', 'diego.vargas@globaltech.com', '+51 965432109', 'Ana Salazar (Esposa)', '+51 983344556', 'O+', '1989-11-03', '2022-08-10', 2, 3, 4, 2, '/uploads/photos/emp-1003.png', 'PRESENTIAL', 'ACTIVE'),
-(4, 'EMP-1004', 'DNI', '70984512', 'Camila Lucia', 'Navarro Castro', 'camila.navarro@globaltech.com', '+51 954321098', 'Patricia Castro (Madre)', '+51 984455667', 'B+', '1998-02-18', '2024-02-01', 1, 1, 2, 3, '/uploads/photos/emp-1004.png', 'REMOTE', 'ACTIVE');
+-- 6. EMPLEADOS (Solo personal real de DALUPEZMAR gestionado por el sistema)
+-- No se insertan registros demo.
 
 -- 7. FOTOCHECKS / CREDENCIALES
-INSERT OR IGNORE INTO badges (id, employee_id, badge_code, qr_token_hash, barcode_value, issue_date, expiration_date, status, template_theme) VALUES 
-(1, 1, 'BADGE-EMP-1001', 'AGY_SEC_QR_EMP1001_8f9a2b4c6e8d1a3b5c7e9f0', '45892147', '2026-01-01', '2028-12-31', 'ACTIVE', 'CORPORATE_BLUE'),
-(2, 2, 'BADGE-EMP-1002', 'AGY_SEC_QR_EMP1002_1a2b3c4d5e6f7a8b9c0d1e2', '72314569', '2026-01-01', '2028-12-31', 'ACTIVE', 'MODERN_PURPLE'),
-(3, 3, 'BADGE-EMP-1003', 'AGY_SEC_QR_EMP1003_3f4e5d6c7b8a9f0e1d2c3b4', '48123908', '2026-01-01', '2028-12-31', 'ACTIVE', 'INDUSTRIAL_EMERALD'),
-(4, 4, 'BADGE-EMP-1004', 'AGY_SEC_QR_EMP1004_7a8b9c0d1e2f3a4b5c6d7e8', '70984512', '2026-01-01', '2028-12-31', 'ACTIVE', 'TECH_DARK');
+-- Generados automáticamente para el personal real.
 
 -- 8. CLIENTE API DE INTEROPERABILIDAD
 INSERT OR IGNORE INTO api_clients (id, client_name, api_key_hash, permissions, is_active) VALUES 

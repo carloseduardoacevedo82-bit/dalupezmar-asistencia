@@ -26,14 +26,22 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Sincronización y auditoría de personal, puestos y bajas oficiales de DALUPEZMAR
 try {
-  // 1. Eliminar registros de prueba demo residuales
+  // 1. Eliminar registros de prueba demo residuales (Camila Lucia, Carlos Mendoza, Valeria Rojas, Diego Vargas, etc.)
   db.prepare(`
     DELETE FROM employees 
-    WHERE document_number IN ('12345678', '87654321', '11223344', '55667788', '10000001', '10000002')
-       OR employee_code IN ('ADM-001', 'DEV-002', 'HR-003', 'OPS-004')
+    WHERE document_number IN ('45892147', '72314569', '48123908', '70984512', '12345678', '87654321', '11223344', '55667788', '10000001', '10000002')
+       OR employee_code IN ('EMP-1001', 'EMP-1002', 'EMP-1003', 'EMP-1004', 'ADM-001', 'DEV-002', 'HR-003', 'OPS-004')
+       OR email LIKE '%@globaltech.com'
+       OR first_name LIKE '%Camila Lucia%'
+       OR first_name LIKE '%Valeria Sofia%'
+       OR first_name LIKE '%Diego Alejandro%'
+       OR (first_name LIKE '%Carlos Alberto%' AND last_name LIKE '%Mendoza Quispe%')
        OR first_name LIKE '%Demo%' 
        OR last_name LIKE '%Prueba%'
   `).run();
+
+  // Limpiar credenciales / fotochecks huérfanos asociados a esos IDs
+  db.prepare(`DELETE FROM badges WHERE employee_id NOT IN (SELECT id FROM employees)`).run();
 
   // 2. Asegurar existencia de cargos oficiales
   let posTroquelado = db.prepare("SELECT id FROM positions WHERE name = 'TROQUELADO DE ANILLAS'").get();
