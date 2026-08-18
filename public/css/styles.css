@@ -270,55 +270,66 @@ html {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Modo Claro Premium */
+/* Modo Claro Premium Universal */
 html.light-mode,
-body.light-mode {
+body.light-mode,
+.light-mode body {
   background-color: #f8fafc !important;
   background-image: radial-gradient(at 50% 0%, #ffffff 0%, #f1f5f9 100%) !important;
   color: #0f172a !important;
 }
 
 /* Paneles y Tarjetas */
+.light-mode .glass-panel,
 body.light-mode .glass-panel {
   background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  border: 1.5px solid #e2e8f0 !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 12px 24px -4px rgba(15, 23, 42, 0.06) !important;
   color: #0f172a !important;
 }
 
+.light-mode .glass-card,
 body.light-mode .glass-card {
   background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  border: 1.5px solid #e2e8f0 !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
   color: #0f172a !important;
 }
 
 /* Barra de Navegación */
+.light-mode .glass-nav,
 body.light-mode .glass-nav {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
   border-bottom: 1.5px solid #e2e8f0 !important;
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04) !important;
   color: #0f172a !important;
 }
 
+.light-mode nav .bg-slate-900\/60,
 body.light-mode nav .bg-slate-900\/60 {
   background: #f1f5f9 !important;
   border: 1px solid #e2e8f0 !important;
 }
 
+.light-mode nav a.text-slate-300,
 body.light-mode nav a.text-slate-300 {
   color: #334155 !important;
   font-weight: 700 !important;
 }
 
+.light-mode nav a.text-slate-300:hover,
 body.light-mode nav a.text-slate-300:hover {
   color: #0f172a !important;
   background: #e2e8f0 !important;
 }
 
 /* Formularios, Inputs y Selects */
+.light-mode input:not([type="checkbox"]):not([type="radio"]),
+.light-mode select,
+.light-mode textarea,
 body.light-mode input:not([type="checkbox"]):not([type="radio"]),
 body.light-mode select,
 body.light-mode textarea {
@@ -329,6 +340,9 @@ body.light-mode textarea {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 
+.light-mode input:focus,
+.light-mode select:focus,
+.light-mode textarea:focus,
 body.light-mode input:focus,
 body.light-mode select:focus,
 body.light-mode textarea:focus {
@@ -337,32 +351,39 @@ body.light-mode textarea:focus {
   outline: none !important;
 }
 
+.light-mode input::placeholder,
 body.light-mode input::placeholder {
   color: #64748b !important;
   font-weight: 500 !important;
 }
 
 /* Tipografía de Alto Contraste */
+.light-mode .text-white,
 body.light-mode .text-white {
   color: #0f172a !important;
 }
 
+.light-mode .text-slate-100,
 body.light-mode .text-slate-100 {
   color: #0f172a !important;
 }
 
+.light-mode .text-slate-200,
 body.light-mode .text-slate-200 {
   color: #1e293b !important;
 }
 
+.light-mode .text-slate-300,
 body.light-mode .text-slate-300 {
   color: #334155 !important;
 }
 
+.light-mode .text-slate-400,
 body.light-mode .text-slate-400 {
   color: #475569 !important;
 }
 
+.light-mode .text-slate-500,
 body.light-mode .text-slate-500 {
   color: #64748b !important;
 }

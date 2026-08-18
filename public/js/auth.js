@@ -56,6 +56,12 @@ function applyAppTheme(theme) {
 }
 
 function toggleAppTheme() {
+  // Si está dentro de un iframe con app.html padre, delegar al padre
+  if (window.self !== window.top && window.parent && window.parent.toggleAppTheme) {
+    window.parent.toggleAppTheme();
+    return;
+  }
+
   const current = getSavedTheme();
   const next = current === 'light' ? 'dark' : 'light';
   applyAppTheme(next);
@@ -97,12 +103,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Asegurar tema en body
   applyAppTheme(getSavedTheme());
 
-  // Conectar todos los botones de cambio de tema
+  // Conectar botones de cambio de tema SIN duplicar listeners
   document.querySelectorAll('.btn-theme-toggle').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      toggleAppTheme();
-    });
+    if (!btn.getAttribute('onclick')) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleAppTheme();
+      });
+    }
   });
 
   // Verificar si la página requiere autenticación (todas excepto login y kiosco)
