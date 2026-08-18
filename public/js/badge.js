@@ -440,6 +440,9 @@ function renderBadge(emp) {
     }
   }
 
+  if (window.lucide) lucide.createIcons();
+}
+
 let badgeCameraStream = null;
 let badgeCameraFacing = 'user'; // 'user' (frontal) o 'environment' (trasera)
 let badgeCapturedBlob = null;
