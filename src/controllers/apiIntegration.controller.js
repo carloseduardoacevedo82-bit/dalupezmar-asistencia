@@ -198,7 +198,45 @@ const syncEmployeesFromERP = (req, res) => {
   }
 };
 
+/**
+ * Endpoint para sincronización directa de colaboradores con EPP Control y otros sistemas
+ */
+const getEmployeesRoster = (req, res) => {
+  try {
+    const employees = db.prepare(`
+      SELECT 
+        e.id,
+        e.employee_code,
+        e.document_type,
+        e.document_number,
+        e.first_name,
+        e.last_name,
+        e.status,
+        e.blood_type,
+        e.emergency_contact_phone,
+        e.hire_date,
+        d.name as department_name,
+        p.name as position_name,
+        b.name as branch_name,
+        bg.badge_code,
+        bg.barcode_value,
+        bg.qr_token_hash
+      FROM employees e
+      LEFT JOIN departments d ON e.department_id = d.id
+      LEFT JOIN positions p ON e.position_id = p.id
+      LEFT JOIN branches b ON e.branch_id = b.id
+      LEFT JOIN badges bg ON e.id = bg.employee_id AND bg.status = 'ACTIVE'
+      ORDER BY e.last_name ASC
+    `).all();
+
+    return successResponse(res, 'Padrón oficial de colaboradores obtenido con éxito.', employees);
+  } catch (error) {
+    return errorResponse(res, 'Error al obtener padrón de colaboradores.', error.message, 500);
+  }
+};
+
 module.exports = {
   exportAttendanceForERP,
-  syncEmployeesFromERP
+  syncEmployeesFromERP,
+  getEmployeesRoster
 };

@@ -45,6 +45,9 @@ app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/integration', apiIntegrationRoutes);
 
+const apiIntegrationController = require('./controllers/apiIntegration.controller');
+app.get('/api/v1/sync/employees', apiIntegrationController.getEmployeesRoster);
+
 // Endpoint de estado del sistema (Healthcheck)
 app.get('/api/v1/health', (req, res) => {
   res.json({
