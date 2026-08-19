@@ -154,7 +154,27 @@ const punch = (req, res) => {
     }
 
     if (emp.employee_status !== 'ACTIVE') {
-      return errorResponse(res, `Trabajador en estado ${emp.employee_status} (Cesado/Baja). Marcación denegada.`, null, 403);
+      recordAuditLog(
+        1,
+        'PUNCH_BLOCKED_INACTIVE_WORKER',
+        'employees',
+        emp.employee_id,
+        `Intento de marcación bloqueado para trabajador inactivo/de baja: ${emp.first_name} ${emp.last_name} (${emp.employee_code} - DNI: ${emp.document_number})`,
+        req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1'
+      );
+
+      return errorResponse(res, `⛔ TRABAJADOR INACTIVO O DE BAJA (${emp.first_name} ${emp.last_name} - ${emp.employee_code}). Marcación de asistencia denegada. No se registra en el aplicativo.`, {
+        is_inactive: true,
+        employee: {
+          id: emp.employee_id,
+          code: emp.employee_code,
+          name: `${emp.first_name} ${emp.last_name}`,
+          status: emp.employee_status,
+          photo_url: emp.photo_url,
+          position: emp.position_name,
+          department: emp.department_name
+        }
+      }, 403);
     }
 
     // 2. Validación de Geocerca GPS (si aplica para marcación remota/móvil)

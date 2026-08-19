@@ -452,16 +452,25 @@
             }
             document.getElementById('w-res-geo').textContent = geoStr;
 
+            resultBox.className = 'glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 space-y-3 shadow-2xl';
             resultBox.classList.remove('hidden');
             resultBox.scrollIntoView({ behavior: 'smooth' });
           }
 
           showToast('¡Asistencia registrada con éxito!', 'success');
         } else {
-          alert(response.message || 'Error al procesar asistencia.');
+          const msg = response.message || 'Error al procesar asistencia.';
+          alert(msg);
+          if (msg.includes('INACTIVO') || msg.includes('BAJA')) {
+            handleWorkerLogout();
+          }
         }
       } catch (error) {
-        alert(error.message || 'Error al registrar marcación.');
+        const errMsg = error.message || 'Error al registrar marcación.';
+        alert(errMsg);
+        if (errMsg.includes('INACTIVO') || errMsg.includes('BAJA')) {
+          handleWorkerLogout();
+        }
       }
     }
 

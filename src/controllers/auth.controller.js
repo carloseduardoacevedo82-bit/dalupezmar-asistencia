@@ -145,7 +145,7 @@ const workerLogin = (req, res) => {
     }
 
     if (emp.status !== 'ACTIVE') {
-      return errorResponse(res, 'Tu usuario no está activo en el sistema. Contacta a RRHH.', null, 403);
+      return errorResponse(res, '⛔ TRABAJADOR INACTIVO / DADO DE BAJA. Tu registro está dado de baja o inactivo. Acceso denegado al aplicativo.', null, 403);
     }
 
     // Validación de contraseña: por defecto es el mismo número de DNI o password_hash si fue cambiada

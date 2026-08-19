@@ -255,16 +255,73 @@ async function processPunch(token, source = 'KIOSK_QR') {
       await loadRecentLogs();
     } else {
       playFeedbackAudio('error');
-      showToast(response.message || 'Marcación no procesada.', 'error');
+      if (response && (response.message?.includes('INACTIVO') || response.message?.includes('BAJA') || response.data?.is_inactive)) {
+        showInactiveWorkerCard(response.data || {}, response.message);
+      } else {
+        showToast(response.message || 'Marcación no procesada.', 'error');
+      }
     }
   } catch (error) {
     playFeedbackAudio('error');
-    showToast(error.message || 'Credencial no reconocida.', 'error');
+    const errMsg = error.message || 'Credencial no reconocida.';
+    if (errMsg.includes('INACTIVO') || errMsg.includes('BAJA')) {
+      showInactiveWorkerCard(error.data || {}, errMsg);
+    } else {
+      showToast(errMsg, 'error');
+    }
   } finally {
     setTimeout(() => {
       isProcessingScan = false;
     }, 1500);
   }
+}
+
+/**
+ * Mostrar aviso visual de trabajador inactivo o de baja
+ */
+function showInactiveWorkerCard(data, message) {
+  const card = document.getElementById('punch-result-card');
+  if (!card) return;
+
+  const emp = data.employee || {};
+
+  document.getElementById('res-emp-photo').src = emp.photo_url || '/uploads/photos/default-avatar.png';
+  document.getElementById('res-emp-photo').className = 'w-20 h-20 rounded-2xl object-cover border-2 border-rose-500 shadow-lg grayscale';
+  document.getElementById('res-emp-name').textContent = emp.name || 'Trabajador Cesado / Baja';
+  document.getElementById('res-emp-position').textContent = emp.position || 'Sin Acceso Autorizado';
+  document.getElementById('res-emp-dept').textContent = emp.department || 'Personal Inactivo';
+
+  const badgeIcon = document.getElementById('res-badge-status-icon');
+  if (badgeIcon) {
+    badgeIcon.className = 'absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center text-sm shadow animate-pulse';
+    badgeIcon.innerHTML = '<i data-lucide="shield-alert" class="w-4 h-4 stroke-[3]"></i>';
+  }
+
+  const tagEl = document.getElementById('res-punch-tag');
+  tagEl.textContent = '⛔ TRABAJADOR INACTIVO / DADO DE BAJA';
+  tagEl.className = 'text-[11px] font-black uppercase px-3 py-1 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/40 border border-rose-400 animate-pulse';
+
+  const time = new Date().toLocaleTimeString('es-PE', { hour12: true });
+  document.getElementById('res-punch-time').textContent = time;
+
+  const noteEl = document.getElementById('res-punch-note');
+  noteEl.textContent = '❌ MARCACIÓN DENEGADA (NO REGISTRADA)';
+  noteEl.className = 'text-xs font-black text-rose-400';
+
+  card.className = 'glass-panel p-6 rounded-3xl border-2 border-rose-500/80 bg-rose-950/40 shadow-2xl shadow-rose-950/50 transition-all duration-300';
+  card.classList.remove('hidden');
+
+  showToast('⛔ TRABAJADOR INACTIVO O DADO DE BAJA. Marcación denegada.', 'error');
+
+  clearTimeout(card._hideTimeout);
+  card._hideTimeout = setTimeout(() => {
+    card.classList.add('hidden');
+    card.className = 'glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl transition-all duration-300 hidden';
+    const photo = document.getElementById('res-emp-photo');
+    if (photo) photo.className = 'w-20 h-20 rounded-2xl object-cover border-2 border-cyan-400 shadow-lg';
+  }, 7000);
+
+  lucide.createIcons();
 }
 
 /**
@@ -278,9 +335,16 @@ function showPunchResultCard(data, isSuccess, message) {
   const punch = data.punch;
 
   document.getElementById('res-emp-photo').src = emp.photo_url || '/uploads/photos/default-avatar.png';
+  document.getElementById('res-emp-photo').className = 'w-20 h-20 rounded-2xl object-cover border-2 border-cyan-400 shadow-lg';
   document.getElementById('res-emp-name').textContent = emp.name;
   document.getElementById('res-emp-position').textContent = emp.position || 'Colaborador';
   document.getElementById('res-emp-dept').textContent = emp.department || 'General';
+
+  const badgeIcon = document.getElementById('res-badge-status-icon');
+  if (badgeIcon) {
+    badgeIcon.className = 'absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-sm shadow';
+    badgeIcon.innerHTML = '<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>';
+  }
 
   const typeNames = {
     ENTRY: 'ENTRADA CONFIRMADA',
@@ -306,6 +370,7 @@ function showPunchResultCard(data, isSuccess, message) {
     tagEl.className = 'text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
   }
 
+  card.className = 'glass-panel p-6 rounded-3xl border border-slate-800 shadow-2xl transition-all duration-300';
   card.classList.remove('hidden');
 
   // Auto-ocultar después de 6 segundos si no hay otra marcación
