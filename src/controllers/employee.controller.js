@@ -1,6 +1,8 @@
 const db = require('../../database/database');
+const { forceCheckpoint } = require('../../database/database');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { generateSecureQrToken, generateBarcodeValue } = require('../utils/badgeGenerator');
+const { getPeruDateString } = require('../utils/timeCalculations');
 
 /**
  * Listar empleados con filtros dinámicos y paginación
@@ -205,10 +207,10 @@ const createEmployee = (req, res) => {
     const qrHash = generateSecureQrToken(newEmpId, finalEmpCode);
     const barcodeVal = generateBarcodeValue(document_number);
     const badgeCode = `BADGE-${finalEmpCode}`;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getPeruDateString();
     const expiry = new Date();
     expiry.setFullYear(expiry.getFullYear() + 2);
-    const expiryStr = expiry.toISOString().split('T')[0];
+    const expiryStr = getPeruDateString(expiry);
 
     db.prepare(`
       INSERT INTO badges (
@@ -216,6 +218,8 @@ const createEmployee = (req, res) => {
         issue_date, expiration_date, status, template_theme
       ) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
     `).run(newEmpId, badgeCode, qrHash, barcodeVal, today, expiryStr, template_theme);
+
+    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Empleado registrado y fotocheck emitido correctamente.', {
       id: newEmpId,
@@ -293,6 +297,8 @@ const updateEmployee = (req, res) => {
       const barcodeVal = generateBarcodeValue(document_number);
       db.prepare("UPDATE badges SET barcode_value = ? WHERE employee_id = ? AND status = 'ACTIVE'").run(barcodeVal, id);
     }
+
+    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Empleado actualizado exitosamente.');
   } catch (error) {

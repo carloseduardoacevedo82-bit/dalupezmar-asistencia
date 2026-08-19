@@ -18,6 +18,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-daily-export-pdf')?.addEventListener('click', handleDailyExportPdf);
 });
 
+function formatLocalYMD(d = new Date()) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function initReportDates() {
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -26,9 +33,9 @@ function initReportDates() {
   const endInput = document.getElementById('rep-end-date');
   const dailyDateInput = document.getElementById('daily-rep-date');
 
-  if (startInput) startInput.value = firstDay.toISOString().split('T')[0];
-  if (endInput) endInput.value = today.toISOString().split('T')[0];
-  if (dailyDateInput) dailyDateInput.value = today.toISOString().split('T')[0];
+  if (startInput) startInput.value = formatLocalYMD(firstDay);
+  if (endInput) endInput.value = formatLocalYMD(today);
+  if (dailyDateInput) dailyDateInput.value = formatLocalYMD(today);
 }
 
 async function loadDepartmentsFilter() {

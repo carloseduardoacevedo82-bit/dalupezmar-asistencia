@@ -1,6 +1,8 @@
 const db = require('../../database/database');
+const { forceCheckpoint } = require('../../database/database');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { generateSecureQrToken, generateBarcodeValue } = require('../utils/badgeGenerator');
+const { getPeruDateString } = require('../utils/timeCalculations');
 
 /**
  * Endpoint de interoperabilidad para consultar tareo y asistencias desde ERP externo
@@ -155,7 +157,7 @@ const syncEmployeesFromERP = (req, res) => {
             item.emergency_contact_name || null,
             item.emergency_contact_phone || null,
             item.blood_type || 'O+',
-            item.hire_date || new Date().toISOString().split('T')[0],
+            item.hire_date || getPeruDateString(),
             branch.id,
             dept.id,
             pos.id,
@@ -169,16 +171,17 @@ const syncEmployeesFromERP = (req, res) => {
           const newId = insertResult.lastInsertRowid;
           const qrHash = generateSecureQrToken(newId, code);
           const barcodeVal = generateBarcodeValue(item.document_number);
-          const today = new Date().toISOString().split('T')[0];
+          const today = getPeruDateString();
           const expiry = new Date();
           expiry.setFullYear(expiry.getFullYear() + 2);
+          const expiryStr = getPeruDateString(expiry);
 
           db.prepare(`
             INSERT INTO badges (
               employee_id, badge_code, qr_token_hash, barcode_value,
               issue_date, expiration_date, status, template_theme
-            ) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 'CORPORATE_BLUE')
-          `).run(newId, `BADGE-${code}`, qrHash, barcodeVal, today, expiry.toISOString().split('T')[0]);
+            ) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 'DALUPEZMAR_OFFICIAL')
+          `).run(newId, `BADGE-${code}`, qrHash, barcodeVal, today, expiryStr);
 
           results.created++;
         }
@@ -186,6 +189,8 @@ const syncEmployeesFromERP = (req, res) => {
         results.errors.push({ doc: item.document_number, error: err.message });
       }
     }
+
+    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Sincronización procesada con éxito.', results);
   } catch (error) {

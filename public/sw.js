@@ -1,20 +1,20 @@
-const CACHE_NAME = 'dalupezmar-cache-v1.0';
+const CACHE_NAME = 'dalupezmar-cache-v5.0';
 const ASSETS_TO_CACHE = [
   '/',
+  '/app.html',
   '/index.html',
-  '/css/styles.css',
+  '/css/styles.css?v=5.0',
   '/js/api.js',
-  '/js/auth.js',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/js/auth.js?v=5.0',
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -36,7 +36,9 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   event.respondWith(
-    fetch(event.request).catch(() => {
+    fetch(event.request).then((response) => {
+      return response;
+    }).catch(() => {
       return caches.match(event.request);
     })
   );

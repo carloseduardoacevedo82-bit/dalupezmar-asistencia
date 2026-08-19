@@ -1,6 +1,36 @@
 const db = require('../../database/database');
+const { forceCheckpoint } = require('../../database/database');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
-const { calculateTardiness, calculateWorkedMinutes, calculateOvertime, calculateDistanceMeters } = require('../utils/timeCalculations');
+const {
+  getPeruDateString,
+  getPeruTimeString,
+  getPeruDateTimeString,
+  calculateTardiness,
+  calculateWorkedMinutes,
+  calculateOvertime,
+  calculateDistanceMeters
+} = require('../utils/timeCalculations');
+
+/**
+ * Función auxiliar para registrar acciones en la tabla audit_logs
+ */
+function recordAuditLog(userId, action, entityType, entityId, details, ipAddress) {
+  try {
+    db.prepare(`
+      INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      userId || null,
+      action,
+      entityType,
+      String(entityId || ''),
+      typeof details === 'object' ? JSON.stringify(details) : String(details || ''),
+      ipAddress || '127.0.0.1'
+    );
+  } catch (err) {
+    console.warn('Advertencia al registrar auditoría:', err.message);
+  }
+}
 
 /**
  * Buscador universal y ultra-flexible de colaboradores para cualquier tipo de token:
@@ -96,6 +126,7 @@ function findEmployeeByAnyToken(rawToken) {
 
 /**
  * Registro inteligente de marcación de asistencia (Kiosco QR, Lector de Barras o Web Remota)
+ * Persistencia atómica blindada con auditoría y zona horaria de Perú (America/Lima)
  */
 const punch = (req, res) => {
   try {
@@ -142,10 +173,11 @@ const punch = (req, res) => {
       }
     }
 
-    // 3. Obtener o inicializar la jornada consolidada de hoy
+    // 3. Obtener o inicializar la jornada consolidada con hora exacta de Perú (America/Lima)
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const nowIso = now.toISOString();
+    const todayStr = getPeruDateString(now);
+    const nowIso = getPeruDateTimeString(now);
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     let attendance = db.prepare('SELECT * FROM attendances WHERE employee_id = ? AND attendance_date = ?').get(emp.employee_id, todayStr);
 
@@ -153,23 +185,38 @@ const punch = (req, res) => {
     const defaultShiftEntry = emp.shift_entry_time || '07:00:00';
 
     if (!attendance) {
-      // Crear registro diario inicial
-      const insertAtt = db.prepare(`
-        INSERT INTO attendances (
-          employee_id, attendance_date, shift_id, status,
-          expected_entry, expected_exit
-        ) VALUES (?, ?, ?, 'PRESENT', ?, ?)
-      `);
+      // Si el punch solicitado es salida y no hay registro hoy, verificar si hay jornada abierta de ayer
+      if (punch_type === 'EXIT' || punch_type === 'LUNCH_END') {
+        const yesterdayAttendance = db.prepare(`
+          SELECT * FROM attendances 
+          WHERE employee_id = ? AND last_exit_time IS NULL AND attendance_date >= date(?, '-1 day')
+          ORDER BY attendance_date DESC LIMIT 1
+        `).get(emp.employee_id, todayStr);
 
-      const resultAtt = insertAtt.run(
-        emp.employee_id,
-        todayStr,
-        emp.shift_id,
-        defaultShiftEntry,
-        defaultShiftExit
-      );
+        if (yesterdayAttendance) {
+          attendance = yesterdayAttendance;
+        }
+      }
 
-      attendance = db.prepare('SELECT * FROM attendances WHERE id = ?').get(resultAtt.lastInsertRowid);
+      if (!attendance) {
+        // Crear registro diario inicial
+        const insertAtt = db.prepare(`
+          INSERT INTO attendances (
+            employee_id, attendance_date, shift_id, status,
+            expected_entry, expected_exit
+          ) VALUES (?, ?, ?, 'PRESENT', ?, ?)
+        `);
+
+        const resultAtt = insertAtt.run(
+          emp.employee_id,
+          todayStr,
+          emp.shift_id || 4,
+          defaultShiftEntry,
+          defaultShiftExit
+        );
+
+        attendance = db.prepare('SELECT * FROM attendances WHERE id = ?').get(resultAtt.lastInsertRowid);
+      }
     }
 
     // 4. Determinar tipo de marcación inteligente
@@ -204,7 +251,6 @@ const punch = (req, res) => {
     }
 
     // 6. Insertar log individual de marcación con GPS
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
     const insertLog = db.prepare(`
       INSERT INTO attendance_logs (
         attendance_id, employee_id, punch_type, punch_time, punch_source,
@@ -226,7 +272,7 @@ const punch = (req, res) => {
       raw
     );
 
-    // 7. Actualizar la jornada diaria y calcular tardanzas / horas trabajadas hasta las 19:00
+    // 7. Actualizar la jornada diaria y calcular tardanzas / horas trabajadas
     let updatedStatus = attendance.status;
     let tardinessMinutes = attendance.total_minutes_late || 0;
     let workedMinutes = attendance.total_minutes_worked || 0;
@@ -239,12 +285,12 @@ const punch = (req, res) => {
 
     if (resolvedType === 'ENTRY') {
       firstEntry = nowIso;
-      // Calcular tardanza según tolerancia del turno
+      // Calcular tardanza según tolerancia del turno en hora local de Perú
       tardinessMinutes = calculateTardiness(now, defaultShiftEntry, emp.shift_tolerance || 15);
       updatedStatus = tardinessMinutes > 0 ? 'LATE' : 'PRESENT';
       
-      // Cálculo proyectado de jornada operativa de 07:00 a 19:00 (11 horas efectivas descontando 1h refrigerio)
-      workedMinutes = 660; // 11 horas estándar hasta las 19:00
+      // Cálculo proyectado de jornada operativa de 07:00 a 19:00 (11 horas estándar)
+      workedMinutes = 660;
     } else if (resolvedType === 'LUNCH_START') {
       lunchStart = nowIso;
     } else if (resolvedType === 'LUNCH_END') {
@@ -284,7 +330,29 @@ const punch = (req, res) => {
       attendance.id
     );
 
-    // 8. Mensaje personalizado de respuesta
+    // 8. Registro en Auditoría para protección histórica permanente
+    recordAuditLog(
+      null,
+      `PUNCH_${resolvedType}`,
+      'attendances',
+      attendance.id,
+      {
+        employee_id: emp.employee_id,
+        code: emp.employee_code,
+        doc: emp.document_number,
+        punch_type: resolvedType,
+        source: punch_source,
+        tardiness_minutes: tardinessMinutes,
+        worked_minutes: workedMinutes,
+        time: nowIso
+      },
+      ip
+    );
+
+    // 9. Forzar asentamiento en disco físico
+    forceCheckpoint('PASSIVE');
+
+    // 10. Mensaje personalizado de respuesta
     const punchNames = {
       ENTRY: 'Entrada Registrada',
       LUNCH_START: 'Inicio de Refrigerio',
@@ -312,7 +380,7 @@ const punch = (req, res) => {
         position: emp.position_name,
         photo_url: emp.photo_url,
         work_mode: emp.work_mode,
-        branch_name: emp.branch_name || 'Planta Principal'
+        branch_name: emp.branch_name || 'Planta PECEPE S.A.C.'
       },
       punch: {
         type: resolvedType,
@@ -333,12 +401,13 @@ const punch = (req, res) => {
 };
 
 /**
- * Modificar horario y estado de una marcación/asistencia
+ * Modificar horario y estado de una marcación/asistencia con auditoría
  */
 const updateAttendanceRecord = (req, res) => {
   try {
     const { id } = req.params;
     const { first_entry_time, lunch_start_time, lunch_end_time, last_exit_time, status, total_minutes_worked } = req.body;
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     const existing = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
     if (!existing) {
@@ -376,6 +445,17 @@ const updateAttendanceRecord = (req, res) => {
       id
     );
 
+    recordAuditLog(
+      req.user?.id || 1,
+      'ATTENDANCE_UPDATE',
+      'attendances',
+      id,
+      { before: existing, after: req.body },
+      ip
+    );
+
+    forceCheckpoint('PASSIVE');
+
     return successResponse(res, 'Registro de asistencia actualizado exitosamente.');
   } catch (error) {
     return errorResponse(res, 'Error al actualizar asistencia.', error.message);
@@ -383,11 +463,12 @@ const updateAttendanceRecord = (req, res) => {
 };
 
 /**
- * Eliminar una marcación/asistencia errónea
+ * Eliminar una marcación/asistencia errónea con auditoría
  */
 const deleteAttendanceRecord = (req, res) => {
   try {
     const { id } = req.params;
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     const existing = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
     if (!existing) {
@@ -396,6 +477,17 @@ const deleteAttendanceRecord = (req, res) => {
 
     db.prepare('DELETE FROM attendance_logs WHERE attendance_id = ?').run(id);
     db.prepare('DELETE FROM attendances WHERE id = ?').run(id);
+
+    recordAuditLog(
+      req.user?.id || 1,
+      'ATTENDANCE_DELETE',
+      'attendances',
+      id,
+      { deleted_record: existing },
+      ip
+    );
+
+    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Marcación eliminada exitosamente.');
   } catch (error) {
@@ -409,6 +501,7 @@ const deleteAttendanceRecord = (req, res) => {
 const createManualAttendance = (req, res) => {
   try {
     const { employee_id, attendance_date, first_entry_time, last_exit_time, status = 'PRESENT' } = req.body;
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     if (!employee_id || !attendance_date) {
       return errorResponse(res, 'ID de empleado y fecha requeridos.', null, 400);
@@ -426,6 +519,7 @@ const createManualAttendance = (req, res) => {
 
     const existing = db.prepare('SELECT id FROM attendances WHERE employee_id = ? AND attendance_date = ?').get(employee_id, attendance_date);
 
+    let attId;
     if (existing) {
       db.prepare(`
         UPDATE attendances SET
@@ -437,7 +531,7 @@ const createManualAttendance = (req, res) => {
         WHERE id = ?
       `).run(first_entry_time, last_exit_time, status, calculatedWorked, existing.id);
 
-      return successResponse(res, 'Asistencia manual actualizada para el colaborador.', { id: existing.id });
+      attId = existing.id;
     } else {
       const resIns = db.prepare(`
         INSERT INTO attendances (
@@ -446,8 +540,21 @@ const createManualAttendance = (req, res) => {
         ) VALUES (?, ?, ?, ?, '07:00:00', '19:00:00', ?, ?, ?, 1)
       `).run(employee_id, attendance_date, emp.shift_id || 4, status, first_entry_time, last_exit_time, calculatedWorked);
 
-      return successResponse(res, 'Asistencia manual registrada exitosamente.', { id: resIns.lastInsertRowid }, 201);
+      attId = resIns.lastInsertRowid;
     }
+
+    recordAuditLog(
+      req.user?.id || 1,
+      'MANUAL_ATTENDANCE_SAVE',
+      'attendances',
+      attId,
+      { employee_id, attendance_date, first_entry_time, last_exit_time, status },
+      ip
+    );
+
+    forceCheckpoint('PASSIVE');
+
+    return successResponse(res, 'Asistencia manual registrada exitosamente.', { id: attId }, 201);
   } catch (error) {
     return errorResponse(res, 'Error al crear asistencia manual.', error.message);
   }
@@ -458,7 +565,7 @@ const createManualAttendance = (req, res) => {
  */
 const getTodayLogs = (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getPeruDateString(new Date());
 
     const logs = db.prepare(`
       SELECT 
@@ -480,10 +587,10 @@ const getTodayLogs = (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
-      WHERE DATE(l.punch_time) = ?
+      WHERE substr(l.punch_time, 1, 10) = ? OR DATE(l.punch_time) = ?
       ORDER BY l.punch_time DESC
       LIMIT 100
-    `).all(today);
+    `).all(today, today);
 
     return successResponse(res, 'Marcaciones de hoy recuperadas.', logs);
   } catch (error) {
@@ -608,6 +715,8 @@ const createJustification = (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
     `).run(employee_id, attendance_id || null, reason_type, start_date, end_date, description.trim(), docUrl);
 
+    forceCheckpoint('PASSIVE');
+
     return successResponse(res, 'Solicitud de justificación enviada.', { id: result.lastInsertRowid }, 201);
   } catch (error) {
     return errorResponse(res, 'Error al registrar justificación.', error.message);
@@ -636,12 +745,14 @@ const reviewJustification = (req, res) => {
         reviewer_comment = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(status, req.user.id, reviewer_comment || null, id);
+    `).run(status, req.user?.id || 1, reviewer_comment || null, id);
 
     // Si fue aprobada y tenía una asistencia ligada, actualizar el estado de la asistencia a 'JUSTIFIED'
     if (status === 'APPROVED' && justif.attendance_id) {
       db.prepare("UPDATE attendances SET status = 'JUSTIFIED' WHERE id = ?").run(justif.attendance_id);
     }
+
+    forceCheckpoint('PASSIVE');
 
     return successResponse(res, `Justificación ${status === 'APPROVED' ? 'aprobada' : 'rechazada'} exitosamente.`);
   } catch (error) {
@@ -660,3 +771,4 @@ module.exports = {
   createJustification,
   reviewJustification
 };
+

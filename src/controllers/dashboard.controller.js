@@ -1,12 +1,13 @@
 const db = require('../../database/database');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
+const { getPeruDateString } = require('../utils/timeCalculations');
 
 /**
  * Obtener estadísticas en tiempo real del día y tendencias semanales
  */
 const getDashboardStats = (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getPeruDateString(new Date());
 
     // 1. Total empleados activos
     const totalActiveEmployees = db.prepare("SELECT COUNT(*) as count FROM employees WHERE status = 'ACTIVE'").get().count;
@@ -74,10 +75,10 @@ const getDashboardStats = (req, res) => {
       INNER JOIN employees e ON l.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
-      WHERE DATE(l.punch_time) = ?
+      WHERE substr(l.punch_time, 1, 10) = ? OR DATE(l.punch_time) = ?
       ORDER BY l.punch_time DESC
       LIMIT 8
-    `).all(today);
+    `).all(today, today);
 
     return successResponse(res, 'Métricas del dashboard recuperadas.', {
       overview: {
@@ -104,3 +105,4 @@ const getDashboardStats = (req, res) => {
 module.exports = {
   getDashboardStats
 };
+

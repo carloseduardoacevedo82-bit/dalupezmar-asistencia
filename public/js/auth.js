@@ -196,3 +196,43 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 300);
   }, 4000);
 }
+
+// =========================================================================
+// BLOQUEO DEFINITIVO DE DESPLAZAMIENTO HORIZONTAL EN DISPOSITIVOS TÁCTILES
+// =========================================================================
+let _touchStartX = 0;
+let _touchStartY = 0;
+
+window.addEventListener('touchstart', (e) => {
+  if (e.touches && e.touches.length === 1) {
+    _touchStartX = e.touches[0].clientX;
+    _touchStartY = e.touches[0].clientY;
+  }
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+  if (!e.touches || e.touches.length !== 1) return;
+  const currentX = e.touches[0].clientX;
+  const currentY = e.touches[0].clientY;
+  const diffX = Math.abs(currentX - _touchStartX);
+  const diffY = Math.abs(currentY - _touchStartY);
+
+  // Si el movimiento es predominantemente horizontal
+  if (diffX > diffY && diffX > 6) {
+    // Permitir solo dentro de contenedores explícitos de tablas con scroll horizontal
+    let target = e.target;
+    let allowHorizontal = false;
+    while (target && target !== document.body && target !== document.documentElement) {
+      if (target.classList && (target.classList.contains('overflow-x-auto') || target.classList.contains('table-responsive'))) {
+        allowHorizontal = true;
+        break;
+      }
+      target = target.parentElement;
+    }
+
+    if (!allowHorizontal && e.cancelable) {
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+
