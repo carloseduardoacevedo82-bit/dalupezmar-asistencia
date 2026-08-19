@@ -67,12 +67,19 @@ const api = {
       }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Error en la petición al servidor.');
+        const err = new Error(data.message || 'Error en la petición al servidor.');
+        err.status = response.status;
+        err.data = data.data;
+        throw err;
       }
 
       return data;
     } catch (error) {
-      console.warn(`[API Offline Fallback] ${endpoint}:`, error.message);
+      if (error.status) {
+        // Es un error legítimo de la API (403, 404, 400, etc.)
+        throw error;
+      }
+      console.warn(`[API Network Offline Fallback] ${endpoint}:`, error.message);
       throw error;
     }
   },
@@ -96,7 +103,11 @@ const api = {
             body: JSON.stringify(item.payload)
           });
         } catch (err) {
-          remaining.push(item);
+          if (err.status && err.status >= 400 && err.status < 500) {
+            console.warn('[Sync] Marcación descartada de cola por rechazo del servidor:', err.message);
+          } else {
+            remaining.push(item);
+          }
         }
       }
 
@@ -201,8 +212,14 @@ const api = {
         }
         return res;
       } catch (err) {
-        // Modo offline / fallo de conexión: crear marcación local segura y encolar
-        console.warn('Guardando marcación en almacenamiento local permanente del celular (Offline Safe)...');
+        // Si el servidor respondió con un error de validación o rechazo (403 INACTIVO, 404 NO ENCONTRADO, etc.)
+        // NUNCA crear marcación offline ni guardarla localmente: relanzar el error directamente al UI
+        if (err.status && err.status >= 400) {
+          throw err;
+        }
+
+        // Solo en caso de fallo real de red (offline / desconectado)
+        console.warn('Fallo real de red: guardando marcación en almacenamiento local temporal (Offline Safe)...');
         
         const cachedEmployeesStr = localStorage.getItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE) || '[]';
         const cachedEmployees = JSON.parse(cachedEmployeesStr);

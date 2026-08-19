@@ -292,13 +292,17 @@ const updateEmployee = (req, res) => {
       Number(shift_id), photoUrl, work_mode, status, id
     );
 
-    // Actualizar código de barras en badge activo
+    // Actualizar código de barras y estado en badge
     if (document_number) {
       const barcodeVal = generateBarcodeValue(document_number);
-      db.prepare("UPDATE badges SET barcode_value = ? WHERE employee_id = ? AND status = 'ACTIVE'").run(barcodeVal, id);
+      db.prepare("UPDATE badges SET barcode_value = ? WHERE employee_id = ?").run(barcodeVal, id);
+    }
+    if (status) {
+      const badgeStatus = (status === 'INACTIVE' || status === 'SUSPENDED' || status === 'BAJA') ? 'INACTIVE' : 'ACTIVE';
+      db.prepare("UPDATE badges SET status = ? WHERE employee_id = ?").run(badgeStatus, id);
     }
 
-    forceCheckpoint('PASSIVE');
+    forceCheckpoint('TRUNCATE');
 
     return successResponse(res, 'Empleado actualizado exitosamente.');
   } catch (error) {
