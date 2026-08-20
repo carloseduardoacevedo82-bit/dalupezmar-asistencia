@@ -23,6 +23,7 @@
   "author": "Antigravity AI Architecture Team",
   "license": "MIT",
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -33,6 +34,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "pg": "^8.23.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
