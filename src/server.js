@@ -143,7 +143,7 @@ try {
 
   for (const emp of employees) {
     const qrHash = `AGY_SEC_QR_${emp.employee_code}_${emp.document_number}`;
-    const badgeStatus = (emp.status === 'INACTIVE' || emp.status === 'SUSPENDED' || emp.status === 'BAJA') ? 'INACTIVE' : 'ACTIVE';
+    const badgeStatus = (emp.status === 'INACTIVE' || emp.status === 'SUSPENDED' || emp.status === 'BAJA') ? 'REVOKED' : 'ACTIVE';
     insertOrReplaceBadge.run(emp.id, emp.id, `BADGE-${emp.employee_code}`, qrHash, emp.document_number, badgeStatus);
   }
 

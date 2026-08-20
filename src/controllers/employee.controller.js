@@ -298,7 +298,7 @@ const updateEmployee = (req, res) => {
       db.prepare("UPDATE badges SET barcode_value = ? WHERE employee_id = ?").run(barcodeVal, id);
     }
     if (status) {
-      const badgeStatus = (status === 'INACTIVE' || status === 'SUSPENDED' || status === 'BAJA') ? 'INACTIVE' : 'ACTIVE';
+      const badgeStatus = (status === 'INACTIVE' || status === 'SUSPENDED' || status === 'BAJA') ? 'REVOKED' : 'ACTIVE';
       db.prepare("UPDATE badges SET status = ? WHERE employee_id = ?").run(badgeStatus, id);
     }
 
