@@ -1,5 +1,6 @@
 const db = require('../../database/database');
 const { forceCheckpoint } = require('../../database/database');
+const { saveEmployeeToSupabase, deleteEmployeeFromSupabase } = require('../../database/supabaseSync');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { generateSecureQrToken, generateBarcodeValue } = require('../utils/badgeGenerator');
 const { getPeruDateString } = require('../utils/timeCalculations');
@@ -220,6 +221,28 @@ const createEmployee = (req, res) => {
     `).run(newEmpId, badgeCode, qrHash, barcodeVal, today, expiryStr, template_theme);
 
     forceCheckpoint('PASSIVE');
+    saveEmployeeToSupabase({
+      id: newEmpId,
+      employee_code: finalEmpCode,
+      document_type,
+      document_number: document_number.trim(),
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      email: email ? email.trim() : null,
+      phone: phone ? phone.trim() : null,
+      emergency_contact_name: emergency_contact_name ? emergency_contact_name.trim() : null,
+      emergency_contact_phone: emergency_contact_phone ? emergency_contact_phone.trim() : null,
+      blood_type,
+      birth_date: birth_date || null,
+      hire_date,
+      branch_id: Number(branch_id),
+      department_id: Number(department_id),
+      position_id: Number(position_id),
+      shift_id: Number(shift_id),
+      photo_url: photoUrl,
+      work_mode,
+      status: 'ACTIVE'
+    });
 
     return successResponse(res, 'Empleado registrado y fotocheck emitido correctamente.', {
       id: newEmpId,
@@ -303,6 +326,8 @@ const updateEmployee = (req, res) => {
     }
 
     forceCheckpoint('TRUNCATE');
+    const updated = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+    if (updated) saveEmployeeToSupabase(updated);
 
     return successResponse(res, 'Empleado actualizado exitosamente.');
   } catch (error) {
@@ -417,6 +442,7 @@ const deleteEmployee = (req, res) => {
     db.prepare('DELETE FROM employees WHERE id = ?').run(id);
 
     forceCheckpoint('TRUNCATE');
+    deleteEmployeeFromSupabase(id);
 
     return successResponse(res, `Colaborador ${existing.first_name} ${existing.last_name} eliminado permanentemente.`);
   } catch (error) {

@@ -153,6 +153,10 @@ try {
   console.log('Nota de sincronización de personal:', syncErr.message);
 }
 
+// Sincronizar desde Supabase PostgreSQL en la nube
+const { syncFromSupabase } = require('../database/supabaseSync');
+syncFromSupabase(db).catch(e => console.warn('Nota Supabase startup:', e.message));
+
 const server = http.createServer(app);
 
 server.listen(config.port, () => {

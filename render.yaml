@@ -15,3 +15,5 @@ services:
         value: 10000
       - key: JWT_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        value: postgresql://postgres.vsqqvpejgmamcwqpdzze:Dalupezmar2026!@aws-0-us-east-1.pooler.supabase.com:6543/postgres

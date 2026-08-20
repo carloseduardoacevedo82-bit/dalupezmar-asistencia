@@ -1,5 +1,6 @@
 const db = require('../../database/database');
 const { forceCheckpoint } = require('../../database/database');
+const { saveAttendanceToSupabase, saveLogToSupabase } = require('../../database/supabaseSync');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const {
   getPeruDateString,
@@ -369,8 +370,39 @@ const punch = (req, res) => {
       ip
     );
 
-    // 9. Forzar asentamiento en disco físico
+    // 9. Forzar asentamiento en disco físico y guardar en Supabase Cloud
     forceCheckpoint('PASSIVE');
+    saveAttendanceToSupabase({
+      id: attendance.id,
+      employee_id: emp.employee_id,
+      attendance_date: todayStr,
+      shift_id: emp.shift_id || 1,
+      status: updatedStatus,
+      expected_entry: defaultShiftEntry,
+      expected_exit: defaultShiftExit,
+      first_entry_time: firstEntry,
+      lunch_start_time: lunchStart,
+      lunch_end_time: lunchEnd,
+      last_exit_time: lastExit,
+      total_minutes_worked: workedMinutes,
+      total_minutes_late: tardinessMinutes,
+      total_minutes_overtime: overtimeMinutes,
+      is_complete: isComplete
+    });
+    saveLogToSupabase({
+      attendance_id: attendance.id,
+      employee_id: emp.employee_id,
+      punch_type: resolvedType,
+      punch_time: nowIso,
+      punch_source,
+      latitude,
+      longitude,
+      is_within_geofence: isWithinGeofence,
+      device_info,
+      ip_address: ip,
+      raw_token: raw,
+      verification_status: 'VERIFIED'
+    });
 
     // 10. Mensaje personalizado de respuesta
     const punchNames = {
