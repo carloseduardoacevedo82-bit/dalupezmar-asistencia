@@ -399,11 +399,37 @@ const assignEmployeeBranch = (req, res) => {
   }
 };
 
+/**
+ * Eliminar definitivamente a un colaborador y sus registros dependientes
+ */
+const deleteEmployee = (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+    if (!existing) {
+      return errorResponse(res, 'Empleado no encontrado.', null, 404);
+    }
+
+    db.prepare('DELETE FROM badges WHERE employee_id = ?').run(id);
+    db.prepare('DELETE FROM attendance_logs WHERE employee_id = ?').run(id);
+    db.prepare('DELETE FROM attendances WHERE employee_id = ?').run(id);
+    db.prepare('DELETE FROM justifications WHERE employee_id = ?').run(id);
+    db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+
+    forceCheckpoint('TRUNCATE');
+
+    return successResponse(res, `Colaborador ${existing.first_name} ${existing.last_name} eliminado permanentemente.`);
+  } catch (error) {
+    return errorResponse(res, 'Error al eliminar colaborador.', error.message);
+  }
+};
+
 module.exports = {
   getEmployees,
   getEmployeeById,
   createEmployee,
   updateEmployee,
+  deleteEmployee,
   getCatalogs,
   getBranches,
   updateBranchGeofence,

@@ -13,5 +13,6 @@ router.get('/', verifyToken, employeeController.getEmployees);
 router.get('/:id', verifyToken, employeeController.getEmployeeById);
 router.post('/', verifyToken, requireRoles('ADMIN', 'HR'), uploadPhoto.single('photo'), employeeController.createEmployee);
 router.put('/:id', verifyToken, requireRoles('ADMIN', 'HR'), uploadPhoto.single('photo'), employeeController.updateEmployee);
+router.delete('/:id', verifyToken, requireRoles('ADMIN', 'HR'), employeeController.deleteEmployee);
 
 module.exports = router;

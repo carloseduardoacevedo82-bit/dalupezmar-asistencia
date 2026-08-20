@@ -165,6 +165,7 @@ const api = {
     },
     create: (formData) => api.request('/employees', { method: 'POST', body: formData }),
     update: (id, formData) => api.request(`/employees/${id}`, { method: 'PUT', body: formData }),
+    delete: (id) => api.request(`/employees/${id}`, { method: 'DELETE' }),
     getCatalogs: () => api.request('/employees/catalogs'),
     getBranches: () => api.request('/employees/branches'),
     updateBranchGeofence: (id, data) => api.request(`/employees/branches/${id}/geofence`, { method: 'PUT', body: JSON.stringify(data) }),
