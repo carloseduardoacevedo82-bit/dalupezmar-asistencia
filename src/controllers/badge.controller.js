@@ -3,9 +3,9 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { generateSecureQrToken, generateBarcodeValue } = require('../utils/badgeGenerator');
 
 /**
- * Obtener credencial activa de un empleado para renderizado de fotocheck
+ * Obtener credencial activa de un empleado para renderizado de fotocheck (Async PostgreSQL)
  */
-const getBadgeByEmployeeId = (req, res) => {
+const getBadgeByEmployeeId = async (req, res) => {
   try {
     const { employeeId } = req.params;
 
@@ -32,11 +32,12 @@ const getBadgeByEmployeeId = (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
-      WHERE bg.employee_id = ? AND bg.status = 'ACTIVE'
+      WHERE bg.employee_id = $1 AND bg.status = 'ACTIVE'
       ORDER BY bg.id DESC LIMIT 1
     `;
 
-    const badge = db.prepare(query).get(employeeId);
+    const badgeRes = await db.query(query, [Number(employeeId)]);
+    const badge = badgeRes.rows[0];
 
     if (!badge) {
       return errorResponse(res, 'No se encontró un fotocheck activo para este trabajador.', null, 404);
@@ -51,12 +52,13 @@ const getBadgeByEmployeeId = (req, res) => {
 /**
  * Regenerar o emitir un nuevo fotocheck (anula anteriores)
  */
-const regenerateBadge = (req, res) => {
+const regenerateBadge = async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const { template_theme = 'CORPORATE_BLUE', expiration_years = 2 } = req.body;
+    const { template_theme = 'DALUPEZMAR_OFFICIAL', expiration_years = 2 } = req.body;
 
-    const emp = db.prepare('SELECT id, employee_code, document_number, status FROM employees WHERE id = ?').get(employeeId);
+    const empRes = await db.query('SELECT id, employee_code, document_number, status FROM employees WHERE id = $1', [Number(employeeId)]);
+    const emp = empRes.rows[0];
 
     if (!emp) {
       return errorResponse(res, 'Empleado no encontrado.', null, 404);
@@ -66,33 +68,32 @@ const regenerateBadge = (req, res) => {
       return errorResponse(res, 'No se puede emitir fotocheck para un empleado inactivo.', null, 400);
     }
 
-    // Revocar credenciales activas anteriores
-    db.prepare("UPDATE badges SET status = 'REVOKED' WHERE employee_id = ? AND status = 'ACTIVE'").run(employeeId);
+    const createdBadge = await db.transaction(async (client) => {
+      // Revocar credenciales activas anteriores
+      await client.query("UPDATE badges SET status = 'REVOKED' WHERE employee_id = $1 AND status = 'ACTIVE'", [emp.id]);
 
-    // Generar nuevo token seguro y código
-    const qrHash = generateSecureQrToken(emp.id, emp.employee_code);
-    const barcodeVal = generateBarcodeValue(emp.document_number);
-    const badgeCode = `BADGE-${emp.employee_code}-${Date.now().toString().slice(-4)}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const expiry = new Date();
-    expiry.setFullYear(expiry.getFullYear() + Number(expiration_years));
-    const expiryStr = expiry.toISOString().split('T')[0];
+      // Generar nuevo token seguro y código
+      const qrHash = generateSecureQrToken(emp.id, emp.employee_code);
+      const barcodeVal = generateBarcodeValue(emp.document_number);
+      const badgeCode = `BADGE-${emp.employee_code}-${Date.now().toString().slice(-4)}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const expiry = new Date();
+      expiry.setFullYear(expiry.getFullYear() + Number(expiration_years));
+      const expiryStr = expiry.toISOString().split('T')[0];
 
-    const insertResult = db.prepare(`
-      INSERT INTO badges (
-        employee_id, badge_code, qr_token_hash, barcode_value,
-        issue_date, expiration_date, status, template_theme
-      ) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
-    `).run(emp.id, badgeCode, qrHash, barcodeVal, today, expiryStr, template_theme);
+      const insertRes = await client.query(`
+        INSERT INTO badges (
+          employee_id, badge_code, qr_token_hash, barcode_value,
+          issue_date, expiration_date, status, template_theme
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', $7)
+        RETURNING id, badge_code, qr_token_hash, barcode_value, template_theme;
+      `, [emp.id, badgeCode, qrHash, barcodeVal, today, expiryStr, template_theme]);
 
-    return successResponse(res, 'Fotocheck regenerado exitosamente.', {
-      badge_id: insertResult.lastInsertRowid,
-      badge_code: badgeCode,
-      qr_token_hash: qrHash,
-      barcode_value: barcodeVal,
-      template_theme
-    }, 201);
+      return insertRes.rows[0];
+    });
+
+    return successResponse(res, 'Fotocheck regenerado exitosamente.', createdBadge, 201);
   } catch (error) {
     return errorResponse(res, 'Error al regenerar el fotocheck.', error.message);
   }
@@ -101,7 +102,7 @@ const regenerateBadge = (req, res) => {
 /**
  * Verificar validez de un código QR o código de barras escaneado
  */
-const verifyBadgeToken = (req, res) => {
+const verifyBadgeToken = async (req, res) => {
   try {
     const { token } = req.body;
 
@@ -137,12 +138,13 @@ const verifyBadgeToken = (req, res) => {
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
       LEFT JOIN shifts s ON e.shift_id = s.id
-      WHERE (bg.qr_token_hash = ? OR bg.barcode_value = ? OR bg.badge_code = ? OR e.document_number = ? OR e.employee_code = ?)
+      WHERE (bg.qr_token_hash = $1 OR bg.barcode_value = $1 OR bg.badge_code = $1 OR e.document_number = $1 OR e.employee_code = $1)
         AND bg.status = 'ACTIVE'
       ORDER BY bg.id DESC LIMIT 1
     `;
 
-    const badgeInfo = db.prepare(query).get(trimmed, trimmed, trimmed, trimmed, trimmed);
+    const badgeRes = await db.query(query, [trimmed]);
+    const badgeInfo = badgeRes.rows[0];
 
     if (!badgeInfo) {
       return errorResponse(res, 'Credencial inválida, revocada o no encontrada.', null, 404);

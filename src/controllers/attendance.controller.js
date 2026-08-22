@@ -1,6 +1,4 @@
 const db = require('../../database/database');
-const { forceCheckpoint } = require('../../database/database');
-const { saveAttendanceToSupabase, saveLogToSupabase } = require('../../database/supabaseSync');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const {
   getPeruDateString,
@@ -15,29 +13,33 @@ const {
 /**
  * Función auxiliar para registrar acciones en la tabla audit_logs
  */
-function recordAuditLog(userId, action, entityType, entityId, details, ipAddress) {
+async function recordAuditLog(userId, action, entityType, entityId, details, ipAddress) {
   try {
-    db.prepare(`
+    await db.query(`
       INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [
       userId || null,
       action,
       entityType,
       String(entityId || ''),
       typeof details === 'object' ? JSON.stringify(details) : String(details || ''),
       ipAddress || '127.0.0.1'
-    );
+    ]);
   } catch (err) {
     console.warn('Advertencia al registrar auditoría:', err.message);
   }
 }
 
 /**
- * Buscador universal y ultra-flexible de colaboradores para cualquier tipo de token:
+ * Buscador universal y ultra-flexible de colaboradores para cualquier tipo de token (Async PostgreSQL):
  * Soporta: QR delantero con hash, QR trasero con DNI, Código de barras Code128, DNI numérico, Código DAL-XXXX, URLs o JSON
  */
-function findEmployeeByAnyToken(rawToken) {
+/**
+ * Buscador universal y ultra-flexible de colaboradores para cualquier tipo de token (Async PostgreSQL):
+ * Soporta: QR delantero con hash, QR trasero con DNI, Código de barras Code128, DNI numérico, Código DAL-XXXX, URLs, JSON o nombres
+ */
+async function findEmployeeByAnyToken(rawToken) {
   if (!rawToken) return null;
   const clean = String(rawToken).trim();
 
@@ -73,15 +75,22 @@ function findEmployeeByAnyToken(rawToken) {
     LEFT JOIN shifts s ON e.shift_id = s.id
   `;
 
-  // 1. Búsqueda directa por DNI o Código de Empleado
-  let emp = db.prepare(`${baseSelect} WHERE e.document_number = ? OR e.employee_code = ? OR e.id = ?`).get(clean, clean, Number(clean) || 0);
-  if (emp) return emp;
+  // 1. Búsqueda directa por DNI exacto, Código de Empleado exacto o ID numérico
+  const numClean = isNaN(Number(clean)) ? 0 : Number(clean);
+  let empRes = await db.query(
+    `${baseSelect} WHERE e.document_number = $1 OR UPPER(e.employee_code) = UPPER($1) OR (e.id = $2 AND $2 > 0)`,
+    [clean, numClean]
+  );
+  if (empRes.rows.length > 0) return empRes.rows[0];
 
   // 2. Búsqueda por token QR registrado en tabla badges o código de barras
-  const badge = db.prepare('SELECT employee_id FROM badges WHERE qr_token_hash = ? OR barcode_value = ? OR badge_code = ? ORDER BY id DESC LIMIT 1').get(clean, clean, clean);
-  if (badge) {
-    emp = db.prepare(`${baseSelect} WHERE e.id = ?`).get(badge.employee_id);
-    if (emp) return emp;
+  const badgeRes = await db.query(
+    'SELECT employee_id FROM badges WHERE qr_token_hash = $1 OR barcode_value = $1 OR badge_code = $1 ORDER BY id DESC LIMIT 1',
+    [clean]
+  );
+  if (badgeRes.rows.length > 0) {
+    empRes = await db.query(`${baseSelect} WHERE e.id = $1`, [badgeRes.rows[0].employee_id]);
+    if (empRes.rows.length > 0) return empRes.rows[0];
   }
 
   // 3. Token con prefijo oficial AGY_SEC_QR_DAL-XXXX_DNI
@@ -90,36 +99,75 @@ function findEmployeeByAnyToken(rawToken) {
     const parts = cleanSub.split('_');
     for (const p of parts) {
       if (p) {
-        emp = db.prepare(`${baseSelect} WHERE e.document_number = ? OR e.employee_code = ?`).get(p, p);
-        if (emp) return emp;
+        empRes = await db.query(`${baseSelect} WHERE e.document_number = $1 OR UPPER(e.employee_code) = UPPER($1)`, [p]);
+        if (empRes.rows.length > 0) return empRes.rows[0];
       }
     }
   }
 
-  // 4. Búsqueda si contiene secuencia de 8 a 9 dígitos (DNI / Carnet) en cualquier parte del texto
+  // 4. Búsqueda si contiene secuencia de 8 a 9 dígitos (DNI / Carnet de Extranjería)
   const docMatches = clean.match(/\d{8,9}/g);
   if (docMatches) {
     for (const doc of docMatches) {
-      emp = db.prepare(`${baseSelect} WHERE e.document_number = ?`).get(doc);
-      if (emp) return emp;
+      empRes = await db.query(`${baseSelect} WHERE e.document_number = $1`, [doc]);
+      if (empRes.rows.length > 0) return empRes.rows[0];
     }
   }
 
-  // 5. Búsqueda por código de formato DAL-XXXX o DALXXXX o EMP-XXXX
+  // 5. Búsqueda si contiene parámetro URL (?id=, ?dni=, ?code=, ?emp=, ?worker=)
+  const urlParamMatch = clean.match(/[?&](?:id|dni|code|emp|worker)=([^&#]+)/i);
+  if (urlParamMatch && urlParamMatch[1]) {
+    const val = decodeURIComponent(urlParamMatch[1]).trim();
+    const valNum = isNaN(Number(val)) ? 0 : Number(val);
+    empRes = await db.query(
+      `${baseSelect} WHERE e.document_number = $1 OR UPPER(e.employee_code) = UPPER($1) OR (e.id = $2 AND $2 > 0)`,
+      [val, valNum]
+    );
+    if (empRes.rows.length > 0) return empRes.rows[0];
+  }
+
+  // 6. Búsqueda por código de formato DAL-XXXX, DALXXXX, EMP-XXXX o EMPXXXX
   const codeMatch = clean.match(/(DAL|EMP)[-_]?\d{3,5}/i);
   if (codeMatch) {
     const rawCode = codeMatch[0].toUpperCase();
     const formatted = rawCode.includes('-') ? rawCode : rawCode.replace(/(DAL|EMP)/, '$1-');
-    emp = db.prepare(`${baseSelect} WHERE UPPER(e.employee_code) = ? OR UPPER(e.employee_code) = ?`).get(rawCode, formatted);
-    if (emp) return emp;
+    empRes = await db.query(
+      `${baseSelect} WHERE UPPER(e.employee_code) = $1 OR UPPER(e.employee_code) = $2`,
+      [rawCode, formatted]
+    );
+    if (empRes.rows.length > 0) return empRes.rows[0];
   }
 
-  // 6. Búsqueda si contiene parámetro URL (?id= o ?dni=)
-  const urlIdMatch = clean.match(/[?&](?:id|dni|code)=([^&]+)/i);
-  if (urlIdMatch && urlIdMatch[1]) {
-    const val = decodeURIComponent(urlIdMatch[1]).trim();
-    emp = db.prepare(`${baseSelect} WHERE e.document_number = ? OR e.employee_code = ?`).get(val, val);
-    if (emp) return emp;
+  // 7. Búsqueda por objeto JSON escaneado (ej. {"dni":"61267077"} o {"id":85})
+  if (clean.startsWith('{') && clean.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(clean);
+      const targetDoc = parsed.dni || parsed.document_number || parsed.documento;
+      const targetCode = parsed.code || parsed.employee_code || parsed.codigo;
+      const targetId = Number(parsed.id || parsed.employee_id || 0);
+
+      if (targetDoc || targetCode || targetId) {
+        empRes = await db.query(
+          `${baseSelect} WHERE e.document_number = $1 OR UPPER(e.employee_code) = UPPER($2) OR (e.id = $3 AND $3 > 0)`,
+          [String(targetDoc || ''), String(targetCode || ''), targetId]
+        );
+        if (empRes.rows.length > 0) return empRes.rows[0];
+      }
+    } catch (e) {}
+  }
+
+  // 8. Búsqueda por Nombres y Apellidos completos o parciales
+  if (clean.length >= 5 && !clean.includes('http') && !clean.includes('{')) {
+    const cleanUpper = clean.toUpperCase();
+    empRes = await db.query(`
+      ${baseSelect}
+      WHERE UPPER(CONCAT(e.first_name, ' ', e.last_name)) LIKE $1
+         OR UPPER(CONCAT(e.last_name, ' ', e.first_name)) LIKE $1
+         OR UPPER(e.first_name) LIKE $1
+         OR UPPER(e.last_name) LIKE $1
+      ORDER BY e.id ASC LIMIT 1
+    `, [`%${cleanUpper}%`]);
+    if (empRes.rows.length > 0) return empRes.rows[0];
   }
 
   return null;
@@ -127,13 +175,13 @@ function findEmployeeByAnyToken(rawToken) {
 
 /**
  * Registro inteligente de marcación de asistencia (Kiosco QR, Lector de Barras o Web Remota)
- * Persistencia atómica blindada con auditoría y zona horaria de Perú (America/Lima)
+ * Persistencia atómica directa en PostgreSQL con auditoría y zona horaria de Perú (America/Lima)
  */
-const punch = (req, res) => {
+const punch = async (req, res) => {
   try {
     const {
       token,
-      punch_type, // 'ENTRY', 'LUNCH_START', 'LUNCH_END', 'EXIT' o 'AUTO'
+      punch_type,
       punch_source = 'KIOSK_QR',
       latitude,
       longitude,
@@ -148,14 +196,14 @@ const punch = (req, res) => {
     const raw = String(token).trim();
 
     // 1. Identificar al colaborador con el buscador universal
-    const emp = findEmployeeByAnyToken(raw);
+    const emp = await findEmployeeByAnyToken(raw);
 
     if (!emp) {
       return errorResponse(res, `Código o QR no reconocido (${raw}). No se encontró trabajador asociado en el sistema.`, null, 404);
     }
 
     if (emp.employee_status !== 'ACTIVE') {
-      recordAuditLog(
+      await recordAuditLog(
         1,
         'PUNCH_BLOCKED_INACTIVE_WORKER',
         'employees',
@@ -200,211 +248,181 @@ const punch = (req, res) => {
     const nowIso = getPeruDateTimeString(now);
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
-    let attendance = db.prepare('SELECT * FROM attendances WHERE employee_id = ? AND attendance_date = ?').get(emp.employee_id, todayStr);
-
     const defaultShiftExit = emp.shift_exit_time || '19:00:00';
     const defaultShiftEntry = emp.shift_entry_time || '07:00:00';
 
-    if (!attendance) {
-      // Si el punch solicitado es salida y no hay registro hoy, verificar si hay jornada abierta de ayer
-      if (punch_type === 'EXIT' || punch_type === 'LUNCH_END') {
-        const yesterdayAttendance = db.prepare(`
-          SELECT * FROM attendances 
-          WHERE employee_id = ? AND last_exit_time IS NULL AND attendance_date >= date(?, '-1 day')
-          ORDER BY attendance_date DESC LIMIT 1
-        `).get(emp.employee_id, todayStr);
+    // 4. Procesar marcación dentro de una transacción atómica en PostgreSQL
+    const punchResult = await db.transaction(async (client) => {
+      let attRes = await client.query(
+        'SELECT * FROM attendances WHERE employee_id = $1 AND attendance_date = $2',
+        [emp.employee_id, todayStr]
+      );
+      let attendance = attRes.rows[0];
 
-        if (yesterdayAttendance) {
-          attendance = yesterdayAttendance;
+      if (!attendance) {
+        // Si el punch solicitado es salida y no hay registro hoy, verificar si hay jornada abierta de ayer
+        if (punch_type === 'EXIT' || punch_type === 'LUNCH_END') {
+          const yesterdayAttRes = await client.query(`
+            SELECT * FROM attendances 
+            WHERE employee_id = $1 AND last_exit_time IS NULL AND attendance_date >= CURRENT_DATE - INTERVAL '1 day'
+            ORDER BY attendance_date DESC LIMIT 1
+          `, [emp.employee_id]);
+
+          if (yesterdayAttRes.rows.length > 0) {
+            attendance = yesterdayAttRes.rows[0];
+          }
+        }
+
+        if (!attendance) {
+          // Crear o asegurar registro diario inicial
+          const insertAttRes = await client.query(`
+            INSERT INTO attendances (
+              employee_id, attendance_date, shift_id, status,
+              expected_entry, expected_exit
+            ) VALUES ($1, $2, $3, 'PRESENT', $4, $5)
+            ON CONFLICT (employee_id, attendance_date) DO UPDATE SET
+              updated_at = CURRENT_TIMESTAMP
+            RETURNING *;
+          `, [emp.employee_id, todayStr, emp.shift_id || 1, defaultShiftEntry, defaultShiftExit]);
+
+          attendance = insertAttRes.rows[0];
         }
       }
 
-      if (!attendance) {
-        // Crear registro diario inicial
-        const insertAtt = db.prepare(`
-          INSERT INTO attendances (
-            employee_id, attendance_date, shift_id, status,
-            expected_entry, expected_exit
-          ) VALUES (?, ?, ?, 'PRESENT', ?, ?)
-        `);
-
-        const resultAtt = insertAtt.run(
-          emp.employee_id,
-          todayStr,
-          emp.shift_id || 4,
-          defaultShiftEntry,
-          defaultShiftExit
-        );
-
-        attendance = db.prepare('SELECT * FROM attendances WHERE id = ?').get(resultAtt.lastInsertRowid);
+      // Determinar tipo de marcación inteligente
+      let resolvedType = punch_type;
+      if (!resolvedType || resolvedType === 'AUTO') {
+        if (!attendance.first_entry_time) {
+          resolvedType = 'ENTRY';
+        } else if (!attendance.lunch_start_time) {
+          resolvedType = 'LUNCH_START';
+        } else if (!attendance.lunch_end_time) {
+          resolvedType = 'LUNCH_END';
+        } else {
+          resolvedType = 'EXIT';
+        }
       }
-    }
 
-    // 4. Determinar tipo de marcación inteligente
-    let resolvedType = punch_type;
-
-    if (!resolvedType || resolvedType === 'AUTO') {
-      if (!attendance.first_entry_time) {
-        resolvedType = 'ENTRY';
-      } else if (!attendance.lunch_start_time) {
-        resolvedType = 'LUNCH_START';
-      } else if (!attendance.lunch_end_time) {
-        resolvedType = 'LUNCH_END';
-      } else {
-        resolvedType = 'EXIT';
+      // Procesar selfie si existe
+      let selfieUrl = null;
+      if (req.body.photo_selfie && req.body.photo_selfie.startsWith('data:image')) {
+        try {
+          const base64Data = req.body.photo_selfie.replace(/^data:image\/\w+;base64,/, '');
+          const filename = `selfie-${Date.now()}-${emp.employee_id}.jpg`;
+          const fs = require('fs');
+          const path = require('path');
+          const savePath = path.join(__dirname, '../../public/uploads/photos', filename);
+          fs.writeFileSync(savePath, Buffer.from(base64Data, 'base64'));
+          selfieUrl = `/uploads/photos/${filename}`;
+        } catch (err) {
+          console.warn('Error al guardar foto selfie:', err.message);
+        }
       }
-    }
 
-    // 5. Procesar foto selfie de verificación si fue enviada
-    let selfieUrl = null;
-    if (req.body.photo_selfie && req.body.photo_selfie.startsWith('data:image')) {
-      try {
-        const base64Data = req.body.photo_selfie.replace(/^data:image\/\w+;base64,/, '');
-        const filename = `selfie-${Date.now()}-${emp.employee_id}.jpg`;
-        const fs = require('fs');
-        const path = require('path');
-        const savePath = path.join(__dirname, '../../public/uploads/photos', filename);
-        fs.writeFileSync(savePath, Buffer.from(base64Data, 'base64'));
-        selfieUrl = `/uploads/photos/${filename}`;
-      } catch (err) {
-        console.warn('Error al guardar foto selfie:', err.message);
+      // Insertar log individual de marcación
+      await client.query(`
+        INSERT INTO attendance_logs (
+          attendance_id, employee_id, punch_type, punch_time, punch_source,
+          latitude, longitude, is_within_geofence, device_info, ip_address, raw_token, verification_status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'VERIFIED');
+      `, [
+        attendance.id,
+        emp.employee_id,
+        resolvedType,
+        nowIso,
+        punch_source,
+        latitude ? Number(latitude) : null,
+        longitude ? Number(longitude) : null,
+        isWithinGeofence,
+        selfieUrl ? `${device_info || 'Móvil'} | Selfie: ${selfieUrl}` : (device_info || null),
+        ip,
+        raw
+      ]);
+
+      // Actualizar la jornada consolidada
+      let updatedStatus = attendance.status;
+      let tardinessMinutes = attendance.total_minutes_late || 0;
+      let workedMinutes = attendance.total_minutes_worked || 0;
+      let overtimeMinutes = attendance.total_minutes_overtime || 0;
+      let firstEntry = attendance.first_entry_time;
+      let lunchStart = attendance.lunch_start_time;
+      let lunchEnd = attendance.lunch_end_time;
+      let lastExit = attendance.last_exit_time;
+      let isComplete = attendance.is_complete;
+
+      if (resolvedType === 'ENTRY') {
+        firstEntry = nowIso;
+        tardinessMinutes = calculateTardiness(now, defaultShiftEntry, emp.shift_tolerance || 15);
+        updatedStatus = tardinessMinutes > 0 ? 'LATE' : 'PRESENT';
+        workedMinutes = 660; // 11 horas estándar
+      } else if (resolvedType === 'LUNCH_START') {
+        lunchStart = nowIso;
+      } else if (resolvedType === 'LUNCH_END') {
+        lunchEnd = nowIso;
+      } else if (resolvedType === 'EXIT') {
+        lastExit = nowIso;
+        if (firstEntry) {
+          workedMinutes = calculateWorkedMinutes(firstEntry, nowIso, emp.lunch_duration_minutes || 60);
+          overtimeMinutes = calculateOvertime(now, defaultShiftExit);
+          isComplete = 1;
+        }
       }
-    }
 
-    // 6. Insertar log individual de marcación con GPS
-    const insertLog = db.prepare(`
-      INSERT INTO attendance_logs (
-        attendance_id, employee_id, punch_type, punch_time, punch_source,
-        latitude, longitude, is_within_geofence, device_info, ip_address, raw_token, verification_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'VERIFIED')
-    `);
+      await client.query(`
+        UPDATE attendances SET
+          status = $1,
+          first_entry_time = $2,
+          lunch_start_time = $3,
+          lunch_end_time = $4,
+          last_exit_time = $5,
+          total_minutes_worked = $6,
+          total_minutes_late = $7,
+          total_minutes_overtime = $8,
+          is_complete = $9,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $10;
+      `, [
+        updatedStatus,
+        firstEntry,
+        lunchStart,
+        lunchEnd,
+        lastExit,
+        workedMinutes,
+        tardinessMinutes,
+        overtimeMinutes,
+        isComplete,
+        attendance.id
+      ]);
 
-    insertLog.run(
-      attendance.id,
-      emp.employee_id,
-      resolvedType,
-      nowIso,
-      punch_source,
-      latitude || null,
-      longitude || null,
-      isWithinGeofence,
-      selfieUrl ? `${device_info || 'Móvil'} | Selfie: ${selfieUrl}` : (device_info || null),
-      ip,
-      raw
-    );
+      return {
+        resolvedType,
+        tardinessMinutes,
+        workedMinutes,
+        attendanceId: attendance.id,
+        selfieUrl
+      };
+    });
 
-    // 7. Actualizar la jornada diaria y calcular tardanzas / horas trabajadas
-    let updatedStatus = attendance.status;
-    let tardinessMinutes = attendance.total_minutes_late || 0;
-    let workedMinutes = attendance.total_minutes_worked || 0;
-    let overtimeMinutes = attendance.total_minutes_overtime || 0;
-    let firstEntry = attendance.first_entry_time;
-    let lunchStart = attendance.lunch_start_time;
-    let lunchEnd = attendance.lunch_end_time;
-    let lastExit = attendance.last_exit_time;
-    let isComplete = attendance.is_complete;
-
-    if (resolvedType === 'ENTRY') {
-      firstEntry = nowIso;
-      // Calcular tardanza según tolerancia del turno en hora local de Perú
-      tardinessMinutes = calculateTardiness(now, defaultShiftEntry, emp.shift_tolerance || 15);
-      updatedStatus = tardinessMinutes > 0 ? 'LATE' : 'PRESENT';
-      
-      // Cálculo proyectado de jornada operativa de 07:00 a 19:00 (11 horas estándar)
-      workedMinutes = 660;
-    } else if (resolvedType === 'LUNCH_START') {
-      lunchStart = nowIso;
-    } else if (resolvedType === 'LUNCH_END') {
-      lunchEnd = nowIso;
-    } else if (resolvedType === 'EXIT') {
-      lastExit = nowIso;
-      if (firstEntry) {
-        workedMinutes = calculateWorkedMinutes(firstEntry, nowIso, emp.lunch_duration_minutes || 60);
-        overtimeMinutes = calculateOvertime(now, defaultShiftExit);
-        isComplete = 1;
-      }
-    }
-
-    db.prepare(`
-      UPDATE attendances SET
-        status = ?,
-        first_entry_time = ?,
-        lunch_start_time = ?,
-        lunch_end_time = ?,
-        last_exit_time = ?,
-        total_minutes_worked = ?,
-        total_minutes_late = ?,
-        total_minutes_overtime = ?,
-        is_complete = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      updatedStatus,
-      firstEntry,
-      lunchStart,
-      lunchEnd,
-      lastExit,
-      workedMinutes,
-      tardinessMinutes,
-      overtimeMinutes,
-      isComplete,
-      attendance.id
-    );
-
-    // 8. Registro en Auditoría para protección histórica permanente
-    recordAuditLog(
+    // Registro de auditoría
+    await recordAuditLog(
       null,
-      `PUNCH_${resolvedType}`,
+      `PUNCH_${punchResult.resolvedType}`,
       'attendances',
-      attendance.id,
+      punchResult.attendanceId,
       {
         employee_id: emp.employee_id,
         code: emp.employee_code,
         doc: emp.document_number,
-        punch_type: resolvedType,
+        punch_type: punchResult.resolvedType,
         source: punch_source,
-        tardiness_minutes: tardinessMinutes,
-        worked_minutes: workedMinutes,
+        tardiness_minutes: punchResult.tardinessMinutes,
+        worked_minutes: punchResult.workedMinutes,
         time: nowIso
       },
       ip
     );
 
-    // 9. Forzar asentamiento en disco físico y guardar en Supabase Cloud
-    forceCheckpoint('PASSIVE');
-    saveAttendanceToSupabase({
-      id: attendance.id,
-      employee_id: emp.employee_id,
-      attendance_date: todayStr,
-      shift_id: emp.shift_id || 1,
-      status: updatedStatus,
-      expected_entry: defaultShiftEntry,
-      expected_exit: defaultShiftExit,
-      first_entry_time: firstEntry,
-      lunch_start_time: lunchStart,
-      lunch_end_time: lunchEnd,
-      last_exit_time: lastExit,
-      total_minutes_worked: workedMinutes,
-      total_minutes_late: tardinessMinutes,
-      total_minutes_overtime: overtimeMinutes,
-      is_complete: isComplete
-    });
-    saveLogToSupabase({
-      attendance_id: attendance.id,
-      employee_id: emp.employee_id,
-      punch_type: resolvedType,
-      punch_time: nowIso,
-      punch_source,
-      latitude,
-      longitude,
-      is_within_geofence: isWithinGeofence,
-      device_info,
-      ip_address: ip,
-      raw_token: raw,
-      verification_status: 'VERIFIED'
-    });
-
-    // 10. Mensaje personalizado de respuesta
+    // Mensaje de respuesta amigable
     const punchNames = {
       ENTRY: 'Entrada Registrada',
       LUNCH_START: 'Inicio de Refrigerio',
@@ -412,10 +430,10 @@ const punch = (req, res) => {
       EXIT: 'Salida Registrada'
     };
 
-    let msg = `¡${punchNames[resolvedType] || 'Marcación'} confirmada!`;
-    if (resolvedType === 'ENTRY' && tardinessMinutes > 0) {
-      msg += ` (Tardanza: ${tardinessMinutes} min)`;
-    } else if (resolvedType === 'ENTRY') {
+    let msg = `¡${punchNames[punchResult.resolvedType] || 'Marcación'} confirmada!`;
+    if (punchResult.resolvedType === 'ENTRY' && punchResult.tardinessMinutes > 0) {
+      msg += ` (Tardanza: ${punchResult.tardinessMinutes} min)`;
+    } else if (punchResult.resolvedType === 'ENTRY') {
       msg += ' (Puntual)';
     }
 
@@ -427,23 +445,24 @@ const punch = (req, res) => {
       employee: {
         id: emp.employee_id,
         code: emp.employee_code,
+        document_number: emp.document_number,
         name: `${emp.first_name} ${emp.last_name}`,
         department: emp.department_name,
         position: emp.position_name,
         photo_url: emp.photo_url,
         work_mode: emp.work_mode,
-        branch_name: emp.branch_name || 'Planta PECEPE S.A.C.'
+        branch_name: emp.branch_name || 'DALUPEZMAR Planta Principal'
       },
       punch: {
-        type: resolvedType,
+        type: punchResult.resolvedType,
         time: nowIso,
         source: punch_source,
-        tardiness_minutes: tardinessMinutes,
+        tardiness_minutes: punchResult.tardinessMinutes,
         is_within_geofence: isWithinGeofence === 1,
         distance_meters: distanceToBranch,
         latitude,
         longitude,
-        selfie_url: selfieUrl
+        selfie_url: punchResult.selfieUrl
       }
     });
   } catch (error) {
@@ -455,13 +474,14 @@ const punch = (req, res) => {
 /**
  * Modificar horario y estado de una marcación/asistencia con auditoría
  */
-const updateAttendanceRecord = (req, res) => {
+const updateAttendanceRecord = async (req, res) => {
   try {
     const { id } = req.params;
     const { first_entry_time, lunch_start_time, lunch_end_time, last_exit_time, status, total_minutes_worked } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
-    const existing = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
+    const existingRes = await db.query('SELECT * FROM attendances WHERE id = $1', [id]);
+    const existing = existingRes.rows[0];
     if (!existing) {
       return errorResponse(res, 'Registro de asistencia no encontrado.', null, 404);
     }
@@ -471,23 +491,23 @@ const updateAttendanceRecord = (req, res) => {
       if (first_entry_time && last_exit_time) {
         calculatedWorked = calculateWorkedMinutes(first_entry_time, last_exit_time, 60);
       } else if (first_entry_time) {
-        calculatedWorked = 660; // 11 horas estándar hasta las 19:00
+        calculatedWorked = 660; // 11 horas estándar
       } else {
         calculatedWorked = 0;
       }
     }
 
-    db.prepare(`
+    await db.query(`
       UPDATE attendances SET
-        first_entry_time = ?,
-        lunch_start_time = ?,
-        lunch_end_time = ?,
-        last_exit_time = ?,
-        status = ?,
-        total_minutes_worked = ?,
+        first_entry_time = $1,
+        lunch_start_time = $2,
+        lunch_end_time = $3,
+        last_exit_time = $4,
+        status = $5,
+        total_minutes_worked = $6,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
+      WHERE id = $7
+    `, [
       first_entry_time || existing.first_entry_time,
       lunch_start_time || existing.lunch_start_time,
       lunch_end_time || existing.lunch_end_time,
@@ -495,9 +515,9 @@ const updateAttendanceRecord = (req, res) => {
       status || existing.status,
       calculatedWorked,
       id
-    );
+    ]);
 
-    recordAuditLog(
+    await recordAuditLog(
       req.user?.id || 1,
       'ATTENDANCE_UPDATE',
       'attendances',
@@ -505,8 +525,6 @@ const updateAttendanceRecord = (req, res) => {
       { before: existing, after: req.body },
       ip
     );
-
-    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Registro de asistencia actualizado exitosamente.');
   } catch (error) {
@@ -517,20 +535,23 @@ const updateAttendanceRecord = (req, res) => {
 /**
  * Eliminar una marcación/asistencia errónea con auditoría
  */
-const deleteAttendanceRecord = (req, res) => {
+const deleteAttendanceRecord = async (req, res) => {
   try {
     const { id } = req.params;
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
-    const existing = db.prepare('SELECT * FROM attendances WHERE id = ?').get(id);
+    const existingRes = await db.query('SELECT * FROM attendances WHERE id = $1', [id]);
+    const existing = existingRes.rows[0];
     if (!existing) {
       return errorResponse(res, 'Registro de asistencia no encontrado.', null, 404);
     }
 
-    db.prepare('DELETE FROM attendance_logs WHERE attendance_id = ?').run(id);
-    db.prepare('DELETE FROM attendances WHERE id = ?').run(id);
+    await db.transaction(async (client) => {
+      await client.query('DELETE FROM attendance_logs WHERE attendance_id = $1', [id]);
+      await client.query('DELETE FROM attendances WHERE id = $1', [id]);
+    });
 
-    recordAuditLog(
+    await recordAuditLog(
       req.user?.id || 1,
       'ATTENDANCE_DELETE',
       'attendances',
@@ -538,8 +559,6 @@ const deleteAttendanceRecord = (req, res) => {
       { deleted_record: existing },
       ip
     );
-
-    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Marcación eliminada exitosamente.');
   } catch (error) {
@@ -550,7 +569,7 @@ const deleteAttendanceRecord = (req, res) => {
 /**
  * Registrar asistencia manual para un trabajador (Supervisor / Administrador)
  */
-const createManualAttendance = (req, res) => {
+const createManualAttendance = async (req, res) => {
   try {
     const { employee_id, attendance_date, first_entry_time, last_exit_time, status = 'PRESENT' } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
@@ -559,7 +578,8 @@ const createManualAttendance = (req, res) => {
       return errorResponse(res, 'ID de empleado y fecha requeridos.', null, 400);
     }
 
-    const emp = db.prepare('SELECT * FROM employees WHERE id = ?').get(employee_id);
+    const empRes = await db.query('SELECT * FROM employees WHERE id = $1', [employee_id]);
+    const emp = empRes.rows[0];
     if (!emp) {
       return errorResponse(res, 'Trabajador no encontrado.', null, 404);
     }
@@ -569,33 +589,38 @@ const createManualAttendance = (req, res) => {
       calculatedWorked = calculateWorkedMinutes(first_entry_time, last_exit_time, 60);
     }
 
-    const existing = db.prepare('SELECT id FROM attendances WHERE employee_id = ? AND attendance_date = ?').get(employee_id, attendance_date);
+    const existingRes = await db.query(
+      'SELECT id FROM attendances WHERE employee_id = $1 AND attendance_date = $2',
+      [employee_id, attendance_date]
+    );
+    const existing = existingRes.rows[0];
 
     let attId;
     if (existing) {
-      db.prepare(`
+      await db.query(`
         UPDATE attendances SET
-          first_entry_time = ?,
-          last_exit_time = ?,
-          status = ?,
-          total_minutes_worked = ?,
+          first_entry_time = $1,
+          last_exit_time = $2,
+          status = $3,
+          total_minutes_worked = $4,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(first_entry_time, last_exit_time, status, calculatedWorked, existing.id);
+        WHERE id = $5
+      `, [first_entry_time, last_exit_time, status, calculatedWorked, existing.id]);
 
       attId = existing.id;
     } else {
-      const resIns = db.prepare(`
+      const resIns = await db.query(`
         INSERT INTO attendances (
           employee_id, attendance_date, shift_id, status,
           expected_entry, expected_exit, first_entry_time, last_exit_time, total_minutes_worked, is_complete
-        ) VALUES (?, ?, ?, ?, '07:00:00', '19:00:00', ?, ?, ?, 1)
-      `).run(employee_id, attendance_date, emp.shift_id || 4, status, first_entry_time, last_exit_time, calculatedWorked);
+        ) VALUES ($1, $2, $3, $4, '07:00:00', '19:00:00', $5, $6, $7, 1)
+        RETURNING id;
+      `, [employee_id, attendance_date, emp.shift_id || 1, status, first_entry_time, last_exit_time, calculatedWorked]);
 
-      attId = resIns.lastInsertRowid;
+      attId = resIns.rows[0].id;
     }
 
-    recordAuditLog(
+    await recordAuditLog(
       req.user?.id || 1,
       'MANUAL_ATTENDANCE_SAVE',
       'attendances',
@@ -603,8 +628,6 @@ const createManualAttendance = (req, res) => {
       { employee_id, attendance_date, first_entry_time, last_exit_time, status },
       ip
     );
-
-    forceCheckpoint('PASSIVE');
 
     return successResponse(res, 'Asistencia manual registrada exitosamente.', { id: attId }, 201);
   } catch (error) {
@@ -615,11 +638,11 @@ const createManualAttendance = (req, res) => {
 /**
  * Obtener las marcaciones en vivo del día actual (para Kiosco y Dashboard)
  */
-const getTodayLogs = (req, res) => {
+const getTodayLogs = async (req, res) => {
   try {
     const today = getPeruDateString(new Date());
 
-    const logs = db.prepare(`
+    const logsRes = await db.query(`
       SELECT 
         l.id,
         l.punch_type,
@@ -639,12 +662,12 @@ const getTodayLogs = (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
-      WHERE substr(l.punch_time, 1, 10) = ? OR DATE(l.punch_time) = ?
+      WHERE DATE(l.punch_time) = $1 OR DATE(l.punch_time AT TIME ZONE 'America/Lima') = $1
       ORDER BY l.punch_time DESC
       LIMIT 100
-    `).all(today, today);
+    `, [today]);
 
-    return successResponse(res, 'Marcaciones de hoy recuperadas.', logs);
+    return successResponse(res, 'Marcaciones de hoy recuperadas.', logsRes.rows);
   } catch (error) {
     return errorResponse(res, 'Error al consultar marcaciones del día.', error.message);
   }
@@ -653,7 +676,7 @@ const getTodayLogs = (req, res) => {
 /**
  * Reporte de asistencia con filtros por rango de fechas, trabajador, departamento y estado
  */
-const getAttendanceReport = (req, res) => {
+const getAttendanceReport = async (req, res) => {
   try {
     const { start_date, end_date, employee_id, department_id, status } = req.query;
 
@@ -680,37 +703,43 @@ const getAttendanceReport = (req, res) => {
     `;
 
     const params = [];
+    let pIdx = 1;
 
     if (start_date) {
-      query += ` AND a.attendance_date >= ?`;
+      query += ` AND a.attendance_date >= $${pIdx}`;
       params.push(start_date);
+      pIdx++;
     }
 
     if (end_date) {
-      query += ` AND a.attendance_date <= ?`;
+      query += ` AND a.attendance_date <= $${pIdx}`;
       params.push(end_date);
+      pIdx++;
     }
 
     if (employee_id) {
-      query += ` AND a.employee_id = ?`;
-      params.push(employee_id);
+      query += ` AND a.employee_id = $${pIdx}`;
+      params.push(Number(employee_id));
+      pIdx++;
     }
 
     if (department_id) {
-      query += ` AND e.department_id = ?`;
-      params.push(department_id);
+      query += ` AND e.department_id = $${pIdx}`;
+      params.push(Number(department_id));
+      pIdx++;
     }
 
     if (status) {
-      query += ` AND a.status = ?`;
+      query += ` AND a.status = $${pIdx}`;
       params.push(status);
+      pIdx++;
     }
 
     query += ` ORDER BY a.attendance_date DESC, e.last_name ASC`;
 
-    const records = db.prepare(query).all(...params);
+    const recordsRes = await db.query(query, params);
 
-    return successResponse(res, 'Reporte de asistencia generado.', records);
+    return successResponse(res, 'Reporte de asistencia generado.', recordsRes.rows);
   } catch (error) {
     return errorResponse(res, 'Error al generar reporte de asistencia.', error.message);
   }
@@ -719,7 +748,7 @@ const getAttendanceReport = (req, res) => {
 /**
  * Justificaciones y Regularizaciones (Solicitar / Listar / Aprobar / Rechazar)
  */
-const getJustifications = (req, res) => {
+const getJustifications = async (req, res) => {
   try {
     const { status } = req.query;
     let query = `
@@ -738,19 +767,19 @@ const getJustifications = (req, res) => {
     `;
     const params = [];
     if (status) {
-      query += ` AND j.status = ?`;
+      query += ` AND j.status = $1`;
       params.push(status);
     }
     query += ` ORDER BY j.id DESC`;
 
-    const list = db.prepare(query).all(...params);
-    return successResponse(res, 'Lista de justificaciones.', list);
+    const listRes = await db.query(query, params);
+    return successResponse(res, 'Lista de justificaciones.', listRes.rows);
   } catch (error) {
     return errorResponse(res, 'Error al obtener justificaciones.', error.message);
   }
 };
 
-const createJustification = (req, res) => {
+const createJustification = async (req, res) => {
   try {
     const { employee_id, attendance_id, reason_type, start_date, end_date, description } = req.body;
 
@@ -760,51 +789,50 @@ const createJustification = (req, res) => {
 
     const docUrl = req.file ? `/uploads/photos/${req.file.filename}` : null;
 
-    const result = db.prepare(`
+    const result = await db.query(`
       INSERT INTO justifications (
         employee_id, attendance_id, reason_type, start_date, end_date,
         description, document_url, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
-    `).run(employee_id, attendance_id || null, reason_type, start_date, end_date, description.trim(), docUrl);
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
+      RETURNING id;
+    `, [employee_id, attendance_id || null, reason_type, start_date, end_date, description.trim(), docUrl]);
 
-    forceCheckpoint('PASSIVE');
-
-    return successResponse(res, 'Solicitud de justificación enviada.', { id: result.lastInsertRowid }, 201);
+    return successResponse(res, 'Solicitud de justificación enviada.', { id: result.rows[0].id }, 201);
   } catch (error) {
     return errorResponse(res, 'Error al registrar justificación.', error.message);
   }
 };
 
-const reviewJustification = (req, res) => {
+const reviewJustification = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewer_comment } = req.body; // 'APPROVED' o 'REJECTED'
+    const { status, reviewer_comment } = req.body;
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
       return errorResponse(res, 'Estado no válido. Debe ser APPROVED o REJECTED.', null, 400);
     }
 
-    const justif = db.prepare('SELECT * FROM justifications WHERE id = ?').get(id);
+    const justifRes = await db.query('SELECT * FROM justifications WHERE id = $1', [id]);
+    const justif = justifRes.rows[0];
     if (!justif) {
       return errorResponse(res, 'Justificación no encontrada.', null, 404);
     }
 
-    db.prepare(`
-      UPDATE justifications SET
-        status = ?,
-        reviewed_by = ?,
-        reviewed_at = CURRENT_TIMESTAMP,
-        reviewer_comment = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(status, req.user?.id || 1, reviewer_comment || null, id);
+    await db.transaction(async (client) => {
+      await client.query(`
+        UPDATE justifications SET
+          status = $1,
+          reviewed_by = $2,
+          reviewed_at = CURRENT_TIMESTAMP,
+          reviewer_comment = $3,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $4
+      `, [status, req.user?.id || 1, reviewer_comment || null, id]);
 
-    // Si fue aprobada y tenía una asistencia ligada, actualizar el estado de la asistencia a 'JUSTIFIED'
-    if (status === 'APPROVED' && justif.attendance_id) {
-      db.prepare("UPDATE attendances SET status = 'JUSTIFIED' WHERE id = ?").run(justif.attendance_id);
-    }
-
-    forceCheckpoint('PASSIVE');
+      if (status === 'APPROVED' && justif.attendance_id) {
+        await client.query("UPDATE attendances SET status = 'JUSTIFIED' WHERE id = $1", [justif.attendance_id]);
+      }
+    });
 
     return successResponse(res, `Justificación ${status === 'APPROVED' ? 'aprobada' : 'rechazada'} exitosamente.`);
   } catch (error) {
@@ -823,4 +851,3 @@ module.exports = {
   createJustification,
   reviewJustification
 };
-

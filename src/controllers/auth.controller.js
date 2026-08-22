@@ -7,7 +7,7 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 /**
  * Iniciar sesión de usuario administrativo / kiosco
  */
-const login = (req, res) => {
+const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -15,7 +15,11 @@ const login = (req, res) => {
       return errorResponse(res, 'Debe ingresar el usuario y la contraseña.', null, 400);
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username.trim());
+    const userRes = await db.query(
+      'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
+      [username.trim()]
+    );
+    const user = userRes.rows[0];
 
     if (!user) {
       return errorResponse(res, 'Credenciales incorrectas.', null, 401);
@@ -31,7 +35,7 @@ const login = (req, res) => {
     }
 
     // Actualizar fecha de último login
-    db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+    await db.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
     // Generar token JWT
     const token = jwt.sign(
@@ -63,12 +67,17 @@ const login = (req, res) => {
 /**
  * Obtener perfil del usuario autenticado
  */
-const getProfile = (req, res) => {
+const getProfile = async (req, res) => {
   try {
-    const user = db.prepare(`
+    const userRes = await db.query(`
       SELECT id, username, full_name, email, role, is_active, last_login, created_at
-      FROM users WHERE id = ?
-    `).get(req.user.id);
+      FROM users WHERE id = $1
+    `, [req.user.id]);
+
+    const user = userRes.rows[0];
+    if (!user) {
+      return errorResponse(res, 'Usuario no encontrado.', null, 404);
+    }
 
     return successResponse(res, 'Perfil recuperado con éxito.', user);
   } catch (error) {
@@ -79,7 +88,7 @@ const getProfile = (req, res) => {
 /**
  * Registrar nuevo usuario administrativo (solo ADMIN)
  */
-const registerUser = (req, res) => {
+const registerUser = async (req, res) => {
   try {
     const { username, password, full_name, email, role } = req.body;
 
@@ -87,20 +96,24 @@ const registerUser = (req, res) => {
       return errorResponse(res, 'Los campos username, password y full_name son obligatorios.', null, 400);
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email || '');
-    if (existing) {
+    const existingRes = await db.query(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR (email IS NOT NULL AND LOWER(email) = LOWER($2))',
+      [username.trim(), (email || '').trim()]
+    );
+    if (existingRes.rows.length > 0) {
       return errorResponse(res, 'El nombre de usuario o correo ya está registrado.', null, 409);
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
     const validRole = ['ADMIN', 'HR', 'SUPERVISOR', 'KIOSK', 'AUDITOR'].includes(role) ? role : 'HR';
 
-    const result = db.prepare(`
+    const result = await db.query(`
       INSERT INTO users (username, password_hash, full_name, email, role, is_active)
-      VALUES (?, ?, ?, ?, ?, 1)
-    `).run(username.trim(), passwordHash, full_name.trim(), email ? email.trim() : null, validRole);
+      VALUES ($1, $2, $3, $4, $5, 1)
+      RETURNING id, username, role;
+    `, [username.trim(), passwordHash, full_name.trim(), email ? email.trim() : null, validRole]);
 
-    return successResponse(res, 'Usuario registrado exitosamente.', { id: result.lastInsertRowid, username, role: validRole }, 201);
+    return successResponse(res, 'Usuario registrado exitosamente.', result.rows[0], 201);
   } catch (error) {
     return errorResponse(res, 'Error al registrar usuario.', error.message);
   }
@@ -109,7 +122,7 @@ const registerUser = (req, res) => {
 /**
  * Iniciar sesión independiente para Trabajadores (DNI o Carnet de Extranjería)
  */
-const workerLogin = (req, res) => {
+const workerLogin = async (req, res) => {
   try {
     const { document_number, password } = req.body;
 
@@ -120,7 +133,7 @@ const workerLogin = (req, res) => {
     const docTrim = String(document_number).trim();
     const passTrim = String(password).trim();
 
-    const emp = db.prepare(`
+    const empRes = await db.query(`
       SELECT 
         e.*,
         b.name as branch_name,
@@ -137,8 +150,10 @@ const workerLogin = (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN shifts s ON e.shift_id = s.id
-      WHERE e.document_number = ? OR e.employee_code = ?
-    `).get(docTrim, docTrim);
+      WHERE e.document_number = $1 OR e.employee_code = $2
+    `, [docTrim, docTrim]);
+
+    const emp = empRes.rows[0];
 
     if (!emp) {
       return errorResponse(res, 'Trabajador no encontrado. Verifica tu DNI o Carnet.', null, 404);
@@ -166,7 +181,7 @@ const workerLogin = (req, res) => {
         employee_id: emp.id,
         document_number: emp.document_number,
         employee_code: emp.employee_code,
-        full_name: `${emp.first_name} ${emp.last_name}`,
+        full_name: `${emp.first_name} ${emp.last_name}`.trim(),
         role: 'WORKER'
       },
       config.jwt.secret,
@@ -179,16 +194,16 @@ const workerLogin = (req, res) => {
         id: emp.id,
         code: emp.employee_code,
         document_number: emp.document_number,
-        name: `${emp.first_name} ${emp.last_name}`,
+        name: `${emp.first_name} ${emp.last_name}`.trim(),
         first_name: emp.first_name,
         last_name: emp.last_name,
         photo_url: emp.photo_url,
         department: emp.department_name,
         position: emp.position_name,
-        branch_name: emp.branch_name || 'Planta Principal',
+        branch_name: emp.branch_name || 'DALUPEZMAR Planta Principal',
         branch_lat: emp.branch_lat,
         branch_lng: emp.branch_lng,
-        branch_radius: emp.branch_radius || 300,
+        branch_radius: emp.branch_radius || 350,
         shift_name: emp.shift_name,
         shift_entry: emp.shift_entry_time,
         shift_exit: emp.shift_exit_time
@@ -202,14 +217,14 @@ const workerLogin = (req, res) => {
 /**
  * Listar todos los usuarios administrativos y supervisores (Solo ADMIN)
  */
-const getAllUsers = (req, res) => {
+const getAllUsers = async (req, res) => {
   try {
-    const users = db.prepare(`
+    const usersRes = await db.query(`
       SELECT id, username, full_name, email, role, is_active, last_login, created_at
       FROM users ORDER BY role ASC, full_name ASC
-    `).all();
+    `);
 
-    return successResponse(res, 'Lista de usuarios administrativos.', users);
+    return successResponse(res, 'Lista de usuarios administrativos.', usersRes.rows);
   } catch (error) {
     return errorResponse(res, 'Error al listar usuarios.', error.message);
   }
@@ -218,12 +233,13 @@ const getAllUsers = (req, res) => {
 /**
  * Actualizar datos y/o contraseña de un usuario administrativo
  */
-const updateUser = (req, res) => {
+const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { full_name, email, role, is_active, password } = req.body;
 
-    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const existingRes = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+    const existing = existingRes.rows[0];
     if (!existing) {
       return errorResponse(res, 'Usuario no encontrado.', null, 404);
     }
@@ -233,23 +249,23 @@ const updateUser = (req, res) => {
       passwordHash = bcrypt.hashSync(password.trim(), 10);
     }
 
-    db.prepare(`
+    await db.query(`
       UPDATE users SET
-        full_name = ?,
-        email = ?,
-        role = ?,
-        is_active = ?,
-        password_hash = ?,
+        full_name = $1,
+        email = $2,
+        role = $3,
+        is_active = $4,
+        password_hash = $5,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
+      WHERE id = $6
+    `, [
       full_name || existing.full_name,
       email !== undefined ? email : existing.email,
       role || existing.role,
       is_active !== undefined ? Number(is_active) : existing.is_active,
       passwordHash,
       id
-    );
+    ]);
 
     return successResponse(res, 'Usuario actualizado exitosamente.');
   } catch (error) {
@@ -260,14 +276,14 @@ const updateUser = (req, res) => {
 /**
  * Eliminar usuario administrativo
  */
-const deleteUser = (req, res) => {
+const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
     if (Number(id) === Number(req.user.id)) {
       return errorResponse(res, 'No puedes eliminar tu propia cuenta activa.', null, 400);
     }
 
-    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    await db.query('DELETE FROM users WHERE id = $1', [id]);
     return successResponse(res, 'Usuario eliminado exitosamente.');
   } catch (error) {
     return errorResponse(res, 'Error al eliminar usuario.', error.message);

@@ -3,17 +3,18 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { getPeruDateString } = require('../utils/timeCalculations');
 
 /**
- * Obtener estadísticas en tiempo real del día y tendencias semanales
+ * Obtener estadísticas en tiempo real del día y tendencias semanales (Async PostgreSQL)
  */
-const getDashboardStats = (req, res) => {
+const getDashboardStats = async (req, res) => {
   try {
     const today = getPeruDateString(new Date());
 
     // 1. Total empleados activos
-    const totalActiveEmployees = db.prepare("SELECT COUNT(*) as count FROM employees WHERE status = 'ACTIVE'").get().count;
+    const totalActiveRes = await db.query("SELECT COUNT(*) as count FROM employees WHERE status = 'ACTIVE'");
+    const totalActiveEmployees = parseInt(totalActiveRes.rows[0].count, 10);
 
     // 2. Estadísticas de hoy
-    const todayStats = db.prepare(`
+    const todayStatsRes = await db.query(`
       SELECT 
         COUNT(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 END) as present_count,
         COUNT(CASE WHEN status = 'LATE' THEN 1 END) as late_count,
@@ -21,18 +22,21 @@ const getDashboardStats = (req, res) => {
         COALESCE(SUM(total_minutes_late), 0) as total_late_minutes,
         COALESCE(SUM(total_minutes_overtime), 0) as total_overtime_minutes
       FROM attendances
-      WHERE attendance_date = ?
-    `).get(today);
+      WHERE attendance_date = $1
+    `, [today]);
+    const todayStats = todayStatsRes.rows[0];
 
     // 3. Ausentes estimados (Activos - Registrados hoy)
-    const registeredTodayCount = db.prepare("SELECT COUNT(*) as count FROM attendances WHERE attendance_date = ?").get(today).count;
+    const registeredTodayRes = await db.query("SELECT COUNT(*) as count FROM attendances WHERE attendance_date = $1", [today]);
+    const registeredTodayCount = parseInt(registeredTodayRes.rows[0].count, 10);
     const absentCount = Math.max(0, totalActiveEmployees - registeredTodayCount);
 
     // 4. Justificaciones pendientes
-    const pendingJustifications = db.prepare("SELECT COUNT(*) as count FROM justifications WHERE status = 'PENDING'").get().count;
+    const pendingJustRes = await db.query("SELECT COUNT(*) as count FROM justifications WHERE status = 'PENDING'");
+    const pendingJustifications = parseInt(pendingJustRes.rows[0].count, 10);
 
     // 5. Distribución de asistencia por departamento hoy
-    const departmentBreakdown = db.prepare(`
+    const deptBreakdownRes = await db.query(`
       SELECT 
         d.name as department_name,
         COUNT(e.id) as total_employees,
@@ -40,26 +44,26 @@ const getDashboardStats = (req, res) => {
         COUNT(CASE WHEN a.status = 'LATE' THEN 1 END) as late_employees
       FROM departments d
       LEFT JOIN employees e ON d.id = e.department_id AND e.status = 'ACTIVE'
-      LEFT JOIN attendances a ON e.id = a.employee_id AND a.attendance_date = ?
+      LEFT JOIN attendances a ON e.id = a.employee_id AND a.attendance_date = $1
       WHERE d.is_active = 1
-      GROUP BY d.id
+      GROUP BY d.id, d.name
       ORDER BY total_employees DESC
-    `).all(today);
+    `, [today]);
 
     // 6. Tendencia de los últimos 7 días
-    const weeklyTrend = db.prepare(`
+    const weeklyTrendRes = await db.query(`
       SELECT 
         attendance_date,
         COUNT(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 END) as present,
         COUNT(CASE WHEN status = 'LATE' THEN 1 END) as late
       FROM attendances
-      WHERE attendance_date >= date(?, '-7 days')
+      WHERE attendance_date >= CURRENT_DATE - INTERVAL '7 days'
       GROUP BY attendance_date
       ORDER BY attendance_date ASC
-    `).all(today);
+    `);
 
-    // 7. Últimas 10 marcaciones en vivo
-    const recentLogs = db.prepare(`
+    // 7. Últimas marcaciones en vivo
+    const recentLogsRes = await db.query(`
       SELECT 
         l.id,
         l.punch_type,
@@ -75,26 +79,28 @@ const getDashboardStats = (req, res) => {
       INNER JOIN employees e ON l.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
-      WHERE substr(l.punch_time, 1, 10) = ? OR DATE(l.punch_time) = ?
+      WHERE DATE(l.punch_time) = $1 OR DATE(l.punch_time AT TIME ZONE 'America/Lima') = $1
       ORDER BY l.punch_time DESC
-      LIMIT 8
-    `).all(today, today);
+      LIMIT 10
+    `, [today]);
+
+    const presentCount = parseInt(todayStats.present_count, 10) || 0;
 
     return successResponse(res, 'Métricas del dashboard recuperadas.', {
       overview: {
         total_active_employees: totalActiveEmployees,
-        present_today: todayStats.present_count,
-        late_today: todayStats.late_count,
+        present_today: presentCount,
+        late_today: parseInt(todayStats.late_count, 10) || 0,
         absent_today: absentCount,
-        justified_today: todayStats.justified_count,
-        total_late_minutes: todayStats.total_late_minutes,
-        total_overtime_minutes: todayStats.total_overtime_minutes,
+        justified_today: parseInt(todayStats.justified_count, 10) || 0,
+        total_late_minutes: parseInt(todayStats.total_late_minutes, 10) || 0,
+        total_overtime_minutes: parseInt(todayStats.total_overtime_minutes, 10) || 0,
         pending_justifications: pendingJustifications,
-        attendance_rate: totalActiveEmployees > 0 ? Math.round((todayStats.present_count / totalActiveEmployees) * 100) : 0
+        attendance_rate: totalActiveEmployees > 0 ? Math.round((presentCount / totalActiveEmployees) * 100) : 0
       },
-      department_breakdown: departmentBreakdown,
-      weekly_trend: weeklyTrend,
-      recent_logs: recentLogs
+      department_breakdown: deptBreakdownRes.rows,
+      weekly_trend: weeklyTrendRes.rows,
+      recent_logs: recentLogsRes.rows
     });
   } catch (error) {
     console.error('Error al generar métricas del dashboard:', error);
@@ -105,4 +111,3 @@ const getDashboardStats = (req, res) => {
 module.exports = {
   getDashboardStats
 };
-

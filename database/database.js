@@ -1,59 +1,123 @@
-const { DatabaseSync } = require('node:sqlite');
-const path = require('path');
-const fs = require('fs');
+/**
+ * ============================================================================
+ * ADAPTADOR DE BASE DE DATOS RESILIENTE PARA POSTGRESQL (DALUPEZMAR)
+ * ============================================================================
+ * Compatible con Render Managed Postgres, Supabase, Neon y AWS RDS.
+ * Gestiona reconexiones automáticas, pooling seguro y tolerancia a cold starts.
+ */
+
 require('dotenv').config();
+const { Pool } = require('pg');
 
-// 1. Resolver ruta del archivo SQLite local
-const projectRoot = path.resolve(__dirname, '..');
-const rawDbPath = process.env.DB_FILE || 'database/asistencia.db';
-const dbPath = path.isAbsolute(rawDbPath) ? rawDbPath : path.resolve(projectRoot, rawDbPath);
-const dbDir = path.dirname(dbPath);
+const rawConnectionString = process.env.DATABASE_URL || 
+  'postgresql://postgres.vsqqvpejgmamcwqpdzze:Dalupezmar2026!@aws-0-us-east-1.pooler.supabase.com:6543/postgres';
 
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+const poolConfig = {
+  connectionString: rawConnectionString,
+  ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+  max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+  min: parseInt(process.env.DB_POOL_MIN || '2', 10),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+  allowExitOnIdle: false
+};
 
-// 2. Iniciar base de datos SQLite local con modo WAL y llaves foráneas
-const db = new DatabaseSync(dbPath);
-db.exec('PRAGMA journal_mode = WAL;');
-db.exec('PRAGMA synchronous = NORMAL;');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec('PRAGMA busy_timeout = 5000;');
+const pool = new Pool(poolConfig);
 
-// 3. Soporte para conexión y replicación con Turso (LibSQL Serverless Cloud)
-const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
-const tursoToken = process.env.TURSO_AUTH_TOKEN;
-let tursoClient = null;
+// Manejador de errores en clientes inactivos del pool
+pool.on('error', (err, client) => {
+  console.error('⚠️ [PostgreSQL Pool Error]: Error inesperado en cliente inactivo:', err.message);
+});
 
-if (tursoUrl && (tursoUrl.startsWith('libsql://') || tursoUrl.startsWith('https://')) && tursoToken) {
+pool.on('connect', () => {
+  // Conexión exitosa obtenida del pool
+});
+
+/**
+ * Ejecuta una consulta SQL parametrizada
+ * @param {string} text Sentencia SQL con marcadores $1, $2, etc.
+ * @param {Array} params Parámetros de la consulta
+ * @returns {Promise<import('pg').QueryResult>}
+ */
+async function query(text, params = []) {
+  const start = Date.now();
   try {
-    const { createClient } = require('@libsql/client');
-    tursoClient = createClient({
-      url: tursoUrl,
-      authToken: tursoToken
-    });
-    console.log('☁️ Conexión activa con Turso LibSQL Cloud Database:', tursoUrl);
-  } catch (err) {
-    console.warn('⚠️ No se pudo inicializar cliente Turso:', err.message);
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    if (process.env.DEBUG_SQL === 'true') {
+      console.log(`⏱️ [SQL ${duration}ms]:`, text.substring(0, 100), params);
+    }
+    return res;
+  } catch (error) {
+    console.error('❌ [SQL Execution Error]:', error.message, '\nQuery:', text, '\nParams:', params);
+    throw error;
   }
 }
 
-// 4. Función para forzar checkpoint de WAL a disco físico y sincronizar a la nube
-function forceCheckpoint(mode = 'PASSIVE') {
+/**
+ * Obtiene un cliente del pool para operaciones manuales o transacciones
+ */
+async function getClient() {
+  const client = await pool.connect();
+  return client;
+}
+
+/**
+ * Ejecuta un bloque de código dentro de una transacción gestionada
+ * @param {Function} callback Función asíncrona que recibe el cliente de la transacción
+ */
+async function transaction(callback) {
+  const client = await pool.connect();
   try {
-    db.exec(`PRAGMA wal_checkpoint(${mode});`);
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
   } catch (err) {
-    console.warn('Advertencia en wal_checkpoint:', err.message);
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-// Checkpoint al apagar el servidor para garantizar cero pérdida de datos
-process.on('exit', () => forceCheckpoint('TRUNCATE'));
-process.on('SIGINT', () => { forceCheckpoint('TRUNCATE'); process.exit(0); });
-process.on('SIGTERM', () => { forceCheckpoint('TRUNCATE'); process.exit(0); });
+/**
+ * Comprueba el estado de la conexión a la base de datos (Healthcheck)
+ * @returns {Promise<{ ok: boolean, latencyMs: number, error?: string }>}
+ */
+async function pingDb() {
+  const start = Date.now();
+  try {
+    const res = await pool.query('SELECT 1 as alive;');
+    const latency = Date.now() - start;
+    if (res && res.rows && res.rows[0] && res.rows[0].alive === 1) {
+      return { ok: true, latencyMs: latency };
+    }
+    return { ok: false, latencyMs: latency, error: 'Respuesta inesperada de la BD' };
+  } catch (error) {
+    return { ok: false, latencyMs: Date.now() - start, error: error.message };
+  }
+}
 
-module.exports = db;
-module.exports.forceCheckpoint = forceCheckpoint;
-module.exports.tursoClient = tursoClient;
+// Cierre elegante del pool
+process.on('SIGINT', async () => {
+  try {
+    await pool.end();
+  } catch (e) {}
+  process.exit(0);
+});
 
+process.on('SIGTERM', async () => {
+  try {
+    await pool.end();
+  } catch (e) {}
+  process.exit(0);
+});
 
+module.exports = {
+  pool,
+  query,
+  getClient,
+  transaction,
+  pingDb
+};

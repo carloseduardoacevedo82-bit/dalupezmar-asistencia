@@ -15,6 +15,7 @@ const errorResponse = (res, message = 'Ocurrió un error en el servidor', errors
     success: false,
     message,
     errors,
+    data: errors,
     timestamp: new Date().toISOString()
   });
 };

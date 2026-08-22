@@ -1,7 +1,9 @@
 /**
- * Cliente API centralizado para el frontend con Persistencia Permanente Offline-First
- * Garantiza que las marcaciones, lecturas de fotochecks y datos de trabajadores
- * NO se pierdan al cerrar el aplicativo en el celular o reiniciarlo.
+ * ============================================================================
+ * CLIENTE API CENTRALIZADO DALUPEZMAR CON PERSISTENCIA POSTGRESQL Y STATUS REAL
+ * ============================================================================
+ * Conecta el frontend con el backend refactorizado en Render / PostgreSQL.
+ * Incluye monitor de salud de base de datos y alerta visual si la BD está desconectada.
  */
 const API_BASE = '/api/v1';
 
@@ -60,7 +62,7 @@ const api = {
 
       const data = await response.json();
 
-      if (response.status === 401 && !endpoint.includes('/auth/login')) {
+      if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/worker-login')) {
         this.clearSession();
         window.location.href = '/index.html?expired=1';
         return null;
@@ -76,7 +78,6 @@ const api = {
       return data;
     } catch (error) {
       if (error.status) {
-        // Es un error legítimo de la API (403, 404, 400, etc.)
         throw error;
       }
       console.warn(`[API Network Offline Fallback] ${endpoint}:`, error.message);
@@ -120,7 +121,45 @@ const api = {
     }
   },
 
-  // Endpoints específicos
+  // Healthcheck y Estado de la Base de Datos
+  health: {
+    async checkDb() {
+      try {
+        const res = await fetch('/api/v1/health');
+        const data = await res.json();
+        const isDbConnected = res.ok && data.database === 'connected';
+        api.health.renderDbStatusBanner(isDbConnected, data.error);
+        return { isConnected: isDbConnected, data };
+      } catch (err) {
+        api.health.renderDbStatusBanner(false, 'Servidor no responde');
+        return { isConnected: false, error: err.message };
+      }
+    },
+
+    renderDbStatusBanner(isConnected, errorMessage) {
+      let banner = document.getElementById('db-status-alert-banner');
+      if (!isConnected) {
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.id = 'db-status-alert-banner';
+          banner.className = 'fixed top-0 left-0 right-0 z-50 bg-rose-600 text-white px-4 py-2 text-xs md:text-sm font-semibold flex items-center justify-between shadow-lg animate-pulse';
+          document.body.prepend(banner);
+        }
+        banner.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <span>⚠️ <strong>Base de datos no disponible:</strong> El servidor backend no puede comunicarse con la base de datos persistente en la nube. ${errorMessage ? `(${errorMessage})` : ''}</span>
+          </div>
+          <button onclick="api.health.checkDb()" class="bg-rose-800 hover:bg-rose-900 px-3 py-1 rounded text-xs transition">Reintentar</button>
+        `;
+        banner.style.display = 'flex';
+      } else if (banner) {
+        banner.style.display = 'none';
+      }
+    }
+  },
+
+  // Endpoints de Autenticación
   auth: {
     login: (credentials) => api.request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
     workerLogin: (credentials) => api.request('/auth/worker-login', { method: 'POST', body: JSON.stringify(credentials) }),
@@ -131,18 +170,17 @@ const api = {
     deleteUser: (id) => api.request(`/auth/users/${id}`, { method: 'DELETE' })
   },
 
+  // Endpoints de Empleados
   employees: {
     getAll: async (params = {}) => {
       const query = new URLSearchParams(params).toString();
       try {
         const res = await api.request(`/employees?${query}`);
         if (res && res.data) {
-          // Guardar copia permanente en localStorage del celular
           localStorage.setItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE, JSON.stringify(res.data));
         }
         return res;
       } catch (err) {
-        // Fallback local permanente si no hay conexión o se reabre la app
         const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE);
         if (cached) {
           return { success: true, count: JSON.parse(cached).length, data: JSON.parse(cached), offline: true };
@@ -172,22 +210,20 @@ const api = {
     assignBranch: (employeeId, branchId) => api.request(`/employees/${employeeId}/branch`, { method: 'PUT', body: JSON.stringify({ branch_id: branchId }) })
   },
 
+  // Endpoints de Credenciales
   badges: {
     getByEmployeeId: (empId) => api.request(`/badges/employee/${empId}`),
     regenerate: (empId, data) => api.request(`/badges/employee/${empId}/regenerate`, { method: 'POST', body: JSON.stringify(data) }),
     verify: (token) => api.request('/badges/verify', { method: 'POST', body: JSON.stringify({ token }) })
   },
 
+  // Endpoints de Asistencia
   attendance: {
     punch: async (payload) => {
       const nowIso = new Date().toISOString();
-
-      // Guardar inmediatamente en cola de persistencia local
       try {
         const res = await api.request('/attendance/punch', { method: 'POST', body: JSON.stringify(payload) });
-        
         if (res && res.success) {
-          // Guardar en el historial local persistente de hoy
           const todayLogsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.TODAY_LOGS) || '[]';
           let todayLogs = JSON.parse(todayLogsStr);
           if (!Array.isArray(todayLogs)) todayLogs = [];
@@ -213,19 +249,14 @@ const api = {
         }
         return res;
       } catch (err) {
-        // Si el servidor respondió con un error de validación o rechazo (403 INACTIVO, 404 NO ENCONTRADO, etc.)
-        // NUNCA crear marcación offline ni guardarla localmente: relanzar el error directamente al UI
         if (err.status && err.status >= 400) {
           throw err;
         }
 
-        // Solo en caso de fallo real de red (offline / desconectado)
-        console.warn('Fallo real de red: guardando marcación en almacenamiento local temporal (Offline Safe)...');
-        
+        console.warn('Fallo real de red: guardando marcación en almacenamiento local temporal...');
         const cachedEmployeesStr = localStorage.getItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE) || '[]';
         const cachedEmployees = JSON.parse(cachedEmployeesStr);
         
-        // Buscar empleado localmente por DNI o código
         const rawToken = String(payload.token || '');
         const matchedEmp = cachedEmployees.find(e => 
           rawToken.includes(e.document_number) || 
@@ -262,7 +293,6 @@ const api = {
           }
         };
 
-        // Guardar en logs locales
         const todayLogsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.TODAY_LOGS) || '[]';
         let todayLogs = JSON.parse(todayLogsStr);
         if (!Array.isArray(todayLogs)) todayLogs = [];
@@ -281,7 +311,6 @@ const api = {
         });
         localStorage.setItem(LOCAL_STORAGE_KEYS.TODAY_LOGS, JSON.stringify(todayLogs.slice(0, 100)));
 
-        // Guardar en cola de sincronización pendiente
         const pendingStr = localStorage.getItem(LOCAL_STORAGE_KEYS.PENDING_PUNCHES) || '[]';
         let pending = JSON.parse(pendingStr);
         if (!Array.isArray(pending)) pending = [];
@@ -297,20 +326,12 @@ const api = {
       try {
         const res = await api.request('/attendance/today-logs');
         if (res && res.data) {
-          // Fusionar con logs locales si existen
-          const localLogsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.TODAY_LOGS) || '[]';
-          const localLogs = JSON.parse(localLogsStr);
-          
-          // Guardar los datos actualizados
           localStorage.setItem(LOCAL_STORAGE_KEYS.TODAY_LOGS, JSON.stringify(res.data));
-          
-          // Sincronizar en segundo plano si hay pendientes
           api.syncPendingPunches();
           return res;
         }
         return res;
       } catch (err) {
-        // Cargar desde persistencia local del celular
         const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.TODAY_LOGS);
         if (cached) {
           return { success: true, count: JSON.parse(cached).length, data: JSON.parse(cached), offline: true };
@@ -326,7 +347,7 @@ const api = {
     updateRecord: (id, data) => api.request(`/attendance/records/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteRecord: (id) => api.request(`/attendance/records/${id}`, { method: 'DELETE' }),
     createManualRecord: (data) => api.request('/attendance/manual-record', { method: 'POST', body: JSON.stringify(data) }),
-    getJustifications: (params = {}) => {
+    getJustificaciones: (params = {}) => {
       const query = new URLSearchParams(params).toString();
       return api.request(`/attendance/justifications?${query}`);
     },
@@ -334,17 +355,36 @@ const api = {
     reviewJustification: (id, data) => api.request(`/attendance/justifications/${id}/review`, { method: 'PUT', body: JSON.stringify(data) })
   },
 
+  // Endpoints de Portal de Firmas y Documentos
+  signatures: {
+    send: (data) => api.request('/signatures/send', { method: 'POST', body: JSON.stringify(data) }),
+    retry: (documentId) => api.request('/signatures/retry', { method: 'POST', body: JSON.stringify({ document_id: documentId }) }),
+    getByWorker: (workerId) => api.request(`/signatures/worker/${workerId}`),
+    getAll: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return api.request(`/signatures/all?${query}`);
+    }
+  },
+
   dashboard: {
     getStats: () => api.request('/dashboard/stats')
   }
 };
 
-// Activar listener de sincronización cuando el celular recupera conexión a internet
-window.addEventListener('online', () => {
-  api.syncPendingPunches();
-});
+// Monitoreo de salud al iniciar la página y cada 30 segundos
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    api.health.checkDb();
+    api.syncPendingPunches();
+  });
 
-// Sincronización periódica cada 30 segundos
-setInterval(() => {
-  api.syncPendingPunches();
-}, 30000);
+  window.addEventListener('online', () => {
+    api.health.checkDb();
+    api.syncPendingPunches();
+  });
+
+  setInterval(() => {
+    api.health.checkDb();
+    api.syncPendingPunches();
+  }, 30000);
+}

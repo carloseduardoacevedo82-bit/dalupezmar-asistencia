@@ -5,7 +5,7 @@ const db = require('../../database/database');
 /**
  * Middleware para validar llamadas API de sistemas externos (ERP/Planillas)
  */
-const verifyApiKey = (req, res, next) => {
+const verifyApiKey = async (req, res, next) => {
   const apiKey = req.headers['x-api-key'] || req.query.api_key;
 
   if (!apiKey) {
@@ -18,17 +18,27 @@ const verifyApiKey = (req, res, next) => {
     return next();
   }
 
-  const client = db.prepare('SELECT id, client_name, permissions, is_active FROM api_clients WHERE api_key_hash = ?').get(apiKey);
+  try {
+    const clientRes = await db.query(
+      'SELECT id, client_name, permissions, is_active FROM api_clients WHERE api_key_hash = $1',
+      [apiKey]
+    );
+    const client = clientRes.rows[0];
 
-  if (!client || client.is_active !== 1) {
-    return errorResponse(res, 'API Key inválida o cliente inactivo.', null, 403);
+    if (!client || client.is_active !== 1) {
+      return errorResponse(res, 'API Key inválida o cliente inactivo.', null, 403);
+    }
+
+    // Actualizar último uso de manera asíncrona
+    db.query('UPDATE api_clients SET last_used_at = CURRENT_TIMESTAMP WHERE id = $1', [client.id]).catch(e => {
+      console.warn('Advertencia actualizando last_used_at en api_clients:', e.message);
+    });
+
+    req.apiClient = client;
+    next();
+  } catch (error) {
+    return errorResponse(res, 'Error validando API Key.', error.message, 500);
   }
-
-  // Actualizar último uso
-  db.prepare('UPDATE api_clients SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?').run(client.id);
-
-  req.apiClient = client;
-  next();
 };
 
 module.exports = {

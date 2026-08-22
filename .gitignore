@@ -1,6 +1,7 @@
 node_modules/
 *.log
-database/*.db-wal
-database/*.db-shm
+database/*.db*
+scratch/
 .env
+
 
