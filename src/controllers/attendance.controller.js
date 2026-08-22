@@ -662,7 +662,7 @@ const getTodayLogs = async (req, res) => {
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
-      WHERE DATE(l.punch_time) = $1 OR DATE(l.punch_time AT TIME ZONE 'America/Lima') = $1
+      WHERE l.punch_time LIKE $1 || '%'
       ORDER BY l.punch_time DESC
       LIMIT 100
     `, [today]);

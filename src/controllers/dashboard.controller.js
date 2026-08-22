@@ -79,7 +79,7 @@ const getDashboardStats = async (req, res) => {
       INNER JOIN employees e ON l.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN positions p ON e.position_id = p.id
-      WHERE DATE(l.punch_time) = $1 OR DATE(l.punch_time AT TIME ZONE 'America/Lima') = $1
+      WHERE l.punch_time LIKE $1 || '%'
       ORDER BY l.punch_time DESC
       LIMIT 10
     `, [today]);
