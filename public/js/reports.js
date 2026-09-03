@@ -353,8 +353,8 @@ function getAreaHierarchyRank(posName, deptName) {
  * (Excluye automáticamente a Gerencia General y Supervisores Generales)
  */
 async function fetchDailyAttendanceData(dateStr, selectedArea) {
-  // 1. Obtener todos los colaboradores activos y EXCLUIR Gerencia General y Supervisores
-  const empRes = await api.employees.getAll();
+  // 1. Obtener todos los colaboradores activos (fresco desde BD) y EXCLUIR Gerencia General y Supervisores
+  const empRes = await api.employees.getAll({ _t: Date.now() });
   const allEmployees = (empRes && empRes.data) 
     ? empRes.data.filter(e => (e.status || 'ACTIVE') === 'ACTIVE' && !isManagementOrSupervisor(e.position_name, e.department_name)) 
     : [];
@@ -378,7 +378,7 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
       ? 'Troquelado de Anillas' 
       : (posUpper.includes('EXTERIOR') ? 'Área Exterior' : (emp.department_name || 'Producción'));
 
-    const isNight = String(emp.shift_name || emp.shift_type || '').toLowerCase().includes('noct') || String(emp.shift_id) === '2';
+    const isNight = String(emp.shift_name || emp.shift_type || emp.shiftType || '').toLowerCase().includes('noct') || String(emp.shift_id) === '2' || emp.shift_id === 2;
     const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
 
     const firstEntry = att && att.first_entry_time ? new Date(att.first_entry_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';

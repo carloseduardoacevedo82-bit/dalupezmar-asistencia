@@ -173,9 +173,12 @@ const api = {
   // Endpoints de Empleados
   employees: {
     getAll: async (params = {}) => {
-      const query = new URLSearchParams(params).toString();
+      const p = { ...params, _t: Date.now() };
+      const query = new URLSearchParams(p).toString();
       try {
-        const res = await api.request(`/employees?${query}`);
+        const res = await api.request(`/employees?${query}`, {
+          headers: { 'Cache-Control': 'no-cache, no-store' }
+        });
         if (res && res.data) {
           localStorage.setItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE, JSON.stringify(res.data));
         }
@@ -190,7 +193,9 @@ const api = {
     },
     getById: async (id) => {
       try {
-        return await api.request(`/employees/${id}`);
+        return await api.request(`/employees/${id}?_t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache, no-store' }
+        });
       } catch (err) {
         const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE);
         if (cached) {
@@ -201,9 +206,18 @@ const api = {
         throw err;
       }
     },
-    create: (formData) => api.request('/employees', { method: 'POST', body: formData }),
-    update: (id, formData) => api.request(`/employees/${id}`, { method: 'PUT', body: formData }),
-    delete: (id) => api.request(`/employees/${id}`, { method: 'DELETE' }),
+    create: async (formData) => {
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE);
+      return api.request('/employees', { method: 'POST', body: formData });
+    },
+    update: async (id, formData) => {
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE);
+      return api.request(`/employees/${id}`, { method: 'PUT', body: formData });
+    },
+    delete: async (id) => {
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.EMPLOYEES_CACHE);
+      return api.request(`/employees/${id}`, { method: 'DELETE' });
+    },
     getCatalogs: () => api.request('/employees/catalogs'),
     getBranches: () => api.request('/employees/branches'),
     updateBranchGeofence: (id, data) => api.request(`/employees/branches/${id}/geofence`, { method: 'PUT', body: JSON.stringify(data) }),

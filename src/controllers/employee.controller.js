@@ -75,6 +75,7 @@ const getEmployees = async (req, res) => {
 
     const result = await db.query(query, params);
 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return successResponse(res, 'Lista de empleados recuperada.', result.rows);
   } catch (error) {
     console.error('Error al obtener empleados:', error);
@@ -311,15 +312,29 @@ const updateEmployee = async (req, res) => {
       photoUrl = `/uploads/photos/${req.file.filename}`;
     }
 
-    // Normalizar turno (Diurno / Nocturno)
-    let finalShiftType = req.body.shiftType || req.body.shift_type || req.body.turno || existing.shift_type;
-    let finalShiftId = Number(shift_id) || existing.shift_id || 1;
-    if (finalShiftType === 'nocturno' || finalShiftId === 2 || String(req.body.shift_id) === 'nocturno') {
-      finalShiftId = 2;
-      finalShiftType = 'nocturno';
+    // Normalizar turno (Diurno / Nocturno) preservando el turno existente si no se envía explícitamente
+    let finalShiftType = req.body.shiftType || req.body.shift_type || req.body.turno;
+    let finalShiftId = shift_id !== undefined ? Number(shift_id) : undefined;
+
+    if (finalShiftType) {
+      if (String(finalShiftType).toLowerCase().includes('noct') || String(finalShiftType) === '2') {
+        finalShiftId = 2;
+        finalShiftType = 'nocturno';
+      } else {
+        finalShiftId = 1;
+        finalShiftType = 'diurno';
+      }
+    } else if (finalShiftId !== undefined) {
+      if (finalShiftId === 2) {
+        finalShiftId = 2;
+        finalShiftType = 'nocturno';
+      } else {
+        finalShiftId = 1;
+        finalShiftType = 'diurno';
+      }
     } else {
-      finalShiftId = 1;
-      finalShiftType = 'diurno';
+      finalShiftId = existing.shift_id || 1;
+      finalShiftType = existing.shift_type || (finalShiftId === 2 ? 'nocturno' : 'diurno');
     }
 
     await db.transaction(async (client) => {

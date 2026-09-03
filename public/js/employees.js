@@ -221,9 +221,10 @@ function renderEmployeesTable(list) {
 
         <!-- Turno Asignado -->
         <td class="px-6 py-4 min-w-[170px]">
-          <span class="inline-block px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs font-semibold text-slate-300">
-            ${emp.shift_name ? emp.shift_name.split('(')[0] : 'Estándar 07:00-16:00'}
-          </span>
+          ${(String(emp.shift_name || emp.shift_type || '').toLowerCase().includes('noct') || emp.shift_id === 2 || String(emp.shift_id) === '2')
+            ? '<span class="inline-block px-3 py-1.5 rounded-xl bg-purple-950/50 border border-purple-700/60 font-bold text-xs text-purple-300">🌙 Nocturno (19:30 - 07:00)</span>'
+            : '<span class="inline-block px-3 py-1.5 rounded-xl bg-sky-950/50 border border-sky-700/60 font-bold text-xs text-sky-300">☀️ Diurno (07:30 - 19:00)</span>'
+          }
         </td>
 
         <!-- Estado -->

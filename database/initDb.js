@@ -240,12 +240,7 @@ async function init() {
         employee_code, document_type, document_number, first_name, last_name,
         hire_date, branch_id, department_id, position_id, shift_id, photo_url, work_mode, status
       ) VALUES ($1, $2, $3, $4, $5, '2024-01-01', $6, $7, $8, $9, '/uploads/photos/default-avatar.png', 'PRESENTIAL', $10)
-      ON CONFLICT (document_number) DO UPDATE SET
-        first_name = EXCLUDED.first_name,
-        last_name = EXCLUDED.last_name,
-        position_id = EXCLUDED.position_id,
-        status = EXCLUDED.status,
-        shift_id = $9
+      ON CONFLICT (document_number) DO NOTHING
       RETURNING id, employee_code, document_number, status;
     `, [empCode, docType, docNum, w.nombres.trim(), w.apellidos.trim(), branchPlantaId, deptProdId, posId, shiftJrnId, status]);
 
