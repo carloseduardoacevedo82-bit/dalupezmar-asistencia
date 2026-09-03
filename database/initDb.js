@@ -187,12 +187,10 @@ async function init() {
     }
   }
 
-  // 6. Asegurar Turnos (Jornada DALUPEZMAR: 07:00 - 19:00)
+  // 6. Asegurar Turnos Normalizados DALUPEZMAR (Diurno 07:30-19:00 y Nocturno 19:30-07:00)
   const shifts = [
-    { code: 'TUR-JRN-01', name: 'Jornada Continua DALUPEZMAR (07:00 - 19:00)', entry: '07:00:00', exit: '19:00:00', lunchStart: '12:00:00', lunchEnd: '13:00:00', tol: 15 },
-    { code: 'TUR-OP-M', name: 'Turno Operativo Mañana (07:00 - 19:00)', entry: '07:00:00', exit: '19:00:00', lunchStart: '12:00:00', lunchEnd: '13:00:00', tol: 15 },
-    { code: 'TUR-ADM', name: 'Turno Administrativo (08:30 - 17:30)', entry: '08:30:00', exit: '17:30:00', lunchStart: '13:00:00', lunchEnd: '14:00:00', tol: 15 },
-    { code: 'TUR-REM', name: 'Turno Flexible Remoto (09:00 - 18:00)', entry: '09:00:00', exit: '18:00:00', lunchStart: '13:30:00', lunchEnd: '14:30:00', tol: 30 }
+    { code: 'diurno', name: 'Diurno (07:30 - 19:00)', entry: '07:30:00', exit: '19:00:00', lunchStart: '12:30:00', lunchEnd: '13:30:00', tol: 15 },
+    { code: 'nocturno', name: 'Nocturno (19:30 - 07:00)', entry: '19:30:00', exit: '07:00:00', lunchStart: '00:30:00', lunchEnd: '01:30:00', tol: 15 }
   ];
 
   for (const s of shifts) {
@@ -202,7 +200,8 @@ async function init() {
       ON CONFLICT (code) DO UPDATE SET
         name = EXCLUDED.name,
         entry_time = EXCLUDED.entry_time,
-        exit_time = EXCLUDED.exit_time;
+        exit_time = EXCLUDED.exit_time,
+        is_active = 1;
     `, [s.name, s.code, s.entry, s.exit, s.lunchStart, s.lunchEnd, s.tol]);
   }
 

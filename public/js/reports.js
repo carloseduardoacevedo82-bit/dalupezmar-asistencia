@@ -98,12 +98,36 @@ function renderReportTable(data) {
 
   tbody.innerHTML = data.map(row => {
     const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-    const hoursWorked = (Number(row.total_minutes_worked || 0) / 60).toFixed(1);
-    const hoursOvertime = (Number(row.total_minutes_overtime || 0) / 60).toFixed(1);
+    
+    let totalHoras = 0;
+    if (row.first_entry_time && row.last_exit_time) {
+      const entryMs = new Date(row.first_entry_time).getTime();
+      let exitMs = new Date(row.last_exit_time).getTime();
+      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+      const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
+      const netMin = Math.max(0, grossMin - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+    } else if (row.total_minutes_worked && Number(row.total_minutes_worked) > 0) {
+      const netMin = Math.max(0, Number(row.total_minutes_worked) - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+      if (totalHoras === 0) totalHoras = 10.50;
+    } else if (row.status === 'PRESENT' || row.status === 'COMPLETED' || row.status === 'PUNTUAL' || row.status === 'LATE') {
+      totalHoras = 10.50;
+    }
+
+    const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
+    const exceso = Math.max(0, totalHoras - 8.00);
+    const he25 = Number(Math.min(2.00, exceso).toFixed(2));
+    const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
+
+    const isNight = String(row.shift_name || row.shift_type || '').toLowerCase().includes('noct') || String(row.shift_name || '').includes('19:30') || String(row.shift_id) === '2';
+    const shiftBadge = isNight
+      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-400 border border-purple-500/20">🌙 Nocturno</span>'
+      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20">☀️ Diurno</span>';
 
     return `
       <tr class="hover:bg-slate-900/40 transition text-xs">
-        <td class="px-4 py-3 font-bold text-slate-200">${row.attendance_date}</td>
+        <td class="px-4 py-3 font-bold text-slate-200">${String(row.attendance_date || '').split('T')[0]}</td>
         <td class="px-4 py-3 font-sans">
           <p class="font-extrabold text-white text-xs uppercase">${row.first_name} ${row.last_name}</p>
           <p class="text-[10px] text-slate-400 font-mono">${row.employee_code} • DNI ${row.document_number}</p>
@@ -112,17 +136,13 @@ function renderReportTable(data) {
           <p class="font-bold text-slate-300 text-xs">${row.department_name || 'General'}</p>
           <p class="text-[10px] text-cyan-400 font-semibold">${row.position_name || '-'}</p>
         </td>
+        <td class="px-4 py-3 text-center">${shiftBadge}</td>
         <td class="px-4 py-3 text-center text-cyan-300 font-black">${formatTime(row.first_entry_time)}</td>
-        <td class="px-4 py-3 text-center text-slate-400">${formatTime(row.lunch_start_time)}</td>
-        <td class="px-4 py-3 text-center text-slate-400">${formatTime(row.lunch_end_time)}</td>
         <td class="px-4 py-3 text-center text-cyan-300 font-black">${formatTime(row.last_exit_time)}</td>
-        <td class="px-4 py-3 text-center text-emerald-400 font-black">${hoursWorked} h</td>
-        <td class="px-4 py-3 text-center ${row.total_minutes_late > 0 ? 'text-amber-400 font-black' : 'text-slate-500'}">
-          ${row.total_minutes_late > 0 ? row.total_minutes_late + ' m' : '0'}
-        </td>
-        <td class="px-4 py-3 text-center ${row.total_minutes_overtime > 0 ? 'text-cyan-400 font-black' : 'text-slate-500'}">
-          ${row.total_minutes_overtime > 0 ? hoursOvertime + ' h' : '0'}
-        </td>
+        <td class="px-4 py-3 text-right text-emerald-400 font-black">${totalHoras.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-slate-300 font-mono">${horasBase.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-amber-400 font-bold font-mono">${he25.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-orange-400 font-bold font-mono">${he35.toFixed(2)}</td>
         <td class="px-4 py-3 text-center font-sans">
           ${statusTags[row.status] || row.status}
         </td>
@@ -196,70 +216,137 @@ async function exportToExcel() {
       { name: 'Código Empleado', width: 16 },
       { name: 'Documento', width: 16 },
       { name: 'Apellidos y Nombres', width: 38 },
-      { name: 'Departamento / Área', width: 26 },
+      { name: 'Departamento / Área', width: 24 },
       { name: 'Cargo / Puesto', width: 28 },
-      { name: 'Turno', width: 18 },
-      { name: 'Hora Entrada', width: 14 },
-      { name: 'Inicio Refrigerio', width: 16 },
-      { name: 'Fin Refrigerio', width: 16 },
-      { name: 'Hora Salida', width: 14 },
-      { name: 'Horas Trabajadas', width: 18 },
+      { name: 'Turno Asignado', width: 28 },
+      { name: 'Hora Entrada', width: 15 },
+      { name: 'Hora Salida', width: 15 },
+      { name: 'Total Horas Trabajadas', width: 22 },
+      { name: 'Horas Ordinarias', width: 18 },
+      { name: 'Horas Extras 25%', width: 18 },
+      { name: 'Horas Extras 35%', width: 18 },
       { name: 'Minutos Tardanza', width: 16 },
-      { name: 'Horas Extras', width: 16 },
       { name: 'Estado Asistencia', width: 18 }
     ];
 
-    const rows = sortedData.map((r, index) => [
-      index + 1,
-      r.attendance_date,
-      r.employee_code,
-      r.document_number,
-      `${r.last_name}, ${r.first_name}`.toUpperCase(),
-      r.department_name || '',
-      r.position_name || '',
-      r.shift_name || '',
-      r.first_entry_time ? new Date(r.first_entry_time).toLocaleTimeString('es-PE') : '',
-      r.lunch_start_time ? new Date(r.lunch_start_time).toLocaleTimeString('es-PE') : '',
-      r.lunch_end_time ? new Date(r.lunch_end_time).toLocaleTimeString('es-PE') : '',
-      r.last_exit_time ? new Date(r.last_exit_time).toLocaleTimeString('es-PE') : '',
-      Number((r.total_minutes_worked / 60).toFixed(2)),
-      r.total_minutes_late || 0,
-      Number((r.total_minutes_overtime / 60).toFixed(2)),
-      r.status
-    ]);
+    const rows = sortedData.map((r, index) => {
+      const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+      
+      let totalHoras = 0;
+      if (r.first_entry_time && r.last_exit_time) {
+        const entryMs = new Date(r.first_entry_time).getTime();
+        let exitMs = new Date(r.last_exit_time).getTime();
+        if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+        const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
+        const netMin = Math.max(0, grossMin - 60); // Descuento 1h de refrigerio
+        totalHoras = Number((netMin / 60).toFixed(2));
+      } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
+        const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
+        totalHoras = Number((netMin / 60).toFixed(2));
+        if (totalHoras === 0) totalHoras = 10.50;
+      } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
+        totalHoras = 10.50; // Jornada completa computable estándar
+      }
 
-    worksheet.addTable({
-      name: 'TablaTareoGeneral',
-      ref: 'A1',
-      headerRow: true,
-      totalsRow: false,
-      style: {
-        theme: 'TableStyleMedium9',
-        showRowStripes: true,
-      },
-      columns: columns.map(c => ({ name: c.name, filterButton: true })),
-      rows: rows
+      const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
+      const exceso = Math.max(0, totalHoras - 8.00);
+      const he25 = Number(Math.min(2.00, exceso).toFixed(2));
+      const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
+
+      const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
+      const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+
+      return [
+        index + 1,
+        String(r.attendance_date || '').split('T')[0],
+        r.employee_code,
+        r.document_number,
+        `${r.last_name}, ${r.first_name}`.toUpperCase(),
+        r.department_name || '',
+        r.position_name || '',
+        shiftName,
+        formatTime(r.first_entry_time),
+        formatTime(r.last_exit_time),
+        totalHoras,
+        horasBase,
+        he25,
+        he35,
+        r.total_minutes_late || 0,
+        r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
+      ];
     });
+
+    // Fila de inicio de datos
+    worksheet.addRow(columns.map(c => c.name));
+    const startDataRow = 2;
+    rows.forEach(r => worksheet.addRow(r));
+    const endDataRow = startDataRow + rows.length - 1;
+
+    // Fila de totales generales al final con fórmulas nativas SUM de Excel
+    const totalRow = worksheet.addRow([
+      '',
+      'TOTALES GENERALES',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      { formula: `SUM(K${startDataRow}:K${endDataRow})` }, // Suma Total Horas Trabajadas
+      { formula: `SUM(L${startDataRow}:L${endDataRow})` }, // Suma Horas Ordinarias
+      { formula: `SUM(M${startDataRow}:M${endDataRow})` }, // Suma Horas Extras 25%
+      { formula: `SUM(N${startDataRow}:N${endDataRow})` }, // Suma Horas Extras 35%
+      { formula: `SUM(O${startDataRow}:O${endDataRow})` }, // Suma Tardanzas
+      ''
+    ]);
 
     columns.forEach((c, i) => {
       worksheet.getColumn(i + 1).width = c.width;
     });
 
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      row.height = rowNumber === 1 ? 24 : 20;
+      row.height = rowNumber === 1 ? 26 : (rowNumber === endRow + 1 ? 24 : 20);
 
       row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-        cell.font = {
-          name: 'Calibri',
-          size: 11,
-          bold: rowNumber === 1,
-          color: rowNumber === 1 ? { argb: 'FFFFFFFF' } : { argb: 'FF0F172A' }
-        };
+        // Encabezado
+        if (rowNumber === 1) {
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+          cell.alignment = { vertical: 'middle', horizontal: colNumber >= 11 && colNumber <= 15 ? 'right' : 'center' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'medium', color: { argb: 'FF475569' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+          };
+          return;
+        }
 
-        const isLeftAlign = colNumber === 5 || colNumber === 6 || colNumber === 7;
+        // Fila de Totales Generales
+        if (rowNumber === endRow + 1) {
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+            bottom: { style: 'double', color: { argb: 'FFFFFFFF' } }
+          };
+          if (colNumber >= 11 && colNumber <= 15) {
+            cell.numFmt = '0.00';
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          } else if (colNumber === 2) {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          }
+          return;
+        }
+
+        // Filas de Datos
+        cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
+        const isLeftAlign = colNumber === 5 || colNumber === 6 || colNumber === 7 || colNumber === 8;
         cell.alignment = {
           vertical: 'middle',
-          horizontal: isLeftAlign ? 'left' : 'center',
+          horizontal: (colNumber >= 11 && colNumber <= 15) ? 'right' : (isLeftAlign ? 'left' : 'center'),
           wrapText: false
         };
 
@@ -269,6 +356,25 @@ async function exportToExcel() {
           bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
           right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
         };
+
+        // Formato numérico decimal puro (0.00)
+        if (colNumber >= 11 && colNumber <= 14) {
+          cell.numFmt = '0.00';
+          if (colNumber === 11) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
+          if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
+          if (colNumber === 14) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
+        }
+
+        if (colNumber === 16) {
+          const val = String(cell.value || '');
+          if (val === 'PUNTUAL') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
+          } else if (val === 'TARDANZA') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFD97706' } };
+          } else if (val === 'FALTA') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFDC2626' } };
+          }
+        }
       });
     });
 
@@ -281,29 +387,84 @@ async function exportToExcel() {
     link.click();
     window.URL.revokeObjectURL(downloadUrl);
 
-    showToast('¡Archivo Excel (.xlsx) en formato tabla exportado exitosamente!', 'success');
+    showToast('¡Archivo Excel (.xlsx) con distribución de horas exportado exitosamente!', 'success');
     return;
   }
 
-  // Fallback
-  const exportRows = sortedData.map((r, index) => ({
-    'N°': index + 1,
-    'Fecha': r.attendance_date,
-    'Código Empleado': r.employee_code,
-    'Documento': r.document_number,
-    'Apellidos y Nombres': `${r.last_name}, ${r.first_name}`.toUpperCase(),
-    'Departamento / Área': r.department_name || '',
-    'Cargo / Puesto': r.position_name || '',
-    'Turno': r.shift_name || '',
-    'Hora Entrada': r.first_entry_time ? new Date(r.first_entry_time).toLocaleTimeString('es-PE') : '',
-    'Inicio Refrigerio': r.lunch_start_time ? new Date(r.lunch_start_time).toLocaleTimeString('es-PE') : '',
-    'Fin Refrigerio': r.lunch_end_time ? new Date(r.lunch_end_time).toLocaleTimeString('es-PE') : '',
-    'Hora Salida': r.last_exit_time ? new Date(r.last_exit_time).toLocaleTimeString('es-PE') : '',
-    'Horas Trabajadas': Number((r.total_minutes_worked / 60).toFixed(2)),
-    'Minutos Tardanza': r.total_minutes_late || 0,
-    'Horas Extras': Number((r.total_minutes_overtime / 60).toFixed(2)),
-    'Estado Asistencia': r.status
-  }));
+  // Fallback con SheetJS
+  let fTot = 0, fOrd = 0, f25 = 0, f35 = 0, fLate = 0;
+  const exportRows = sortedData.map((r, index) => {
+    const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+
+    let totalHoras = 0;
+    if (r.first_entry_time && r.last_exit_time) {
+      const entryMs = new Date(r.first_entry_time).getTime();
+      let exitMs = new Date(r.last_exit_time).getTime();
+      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+      const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
+      const netMin = Math.max(0, grossMin - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+    } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
+      const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+      if (totalHoras === 0) totalHoras = 10.50;
+    } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
+      totalHoras = 10.50;
+    }
+
+    const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
+    const exceso = Math.max(0, totalHoras - 8.00);
+    const he25 = Number(Math.min(2.00, exceso).toFixed(2));
+    const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
+    const late = Number(r.total_minutes_late || 0);
+
+    fTot += totalHoras;
+    fOrd += horasBase;
+    f25 += he25;
+    f35 += he35;
+    fLate += late;
+
+    const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
+    const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+
+    return {
+      'N°': index + 1,
+      'Fecha': String(r.attendance_date || '').split('T')[0],
+      'Código Empleado': r.employee_code,
+      'Documento': r.document_number,
+      'Apellidos y Nombres': `${r.last_name}, ${r.first_name}`.toUpperCase(),
+      'Departamento / Área': r.department_name || '',
+      'Cargo / Puesto': r.position_name || '',
+      'Turno Asignado': shiftName,
+      'Hora Entrada': formatTime(r.first_entry_time),
+      'Hora Salida': formatTime(r.last_exit_time),
+      'Total Horas Trabajadas': totalHoras,
+      'Horas Ordinarias': horasBase,
+      'Horas Extras 25%': he25,
+      'Horas Extras 35%': he35,
+      'Minutos Tardanza': late,
+      'Estado Asistencia': r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
+    };
+  });
+
+  exportRows.push({
+    'N°': '',
+    'Fecha': 'TOTALES GENERALES',
+    'Código Empleado': '',
+    'Documento': '',
+    'Apellidos y Nombres': '',
+    'Departamento / Área': '',
+    'Cargo / Puesto': '',
+    'Turno Asignado': '',
+    'Hora Entrada': '',
+    'Hora Salida': '',
+    'Total Horas Trabajadas': Number(fTot.toFixed(2)),
+    'Horas Ordinarias': Number(fOrd.toFixed(2)),
+    'Horas Extras 25%': Number(f25.toFixed(2)),
+    'Horas Extras 35%': Number(f35.toFixed(2)),
+    'Minutos Tardanza': fLate,
+    'Estado Asistencia': ''
+  });
 
   const worksheet = XLSX.utils.json_to_sheet(exportRows);
   const workbook = XLSX.utils.book_new();
@@ -436,11 +597,45 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
       ? 'Troquelado de Anillas' 
       : (posUpper.includes('EXTERIOR') ? 'Área Exterior' : (emp.department_name || 'Producción'));
 
+    const isNight = String(emp.shift_name || emp.shift_type || '').toLowerCase().includes('noct') || String(emp.shift_id) === '2';
+    const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+
     const firstEntry = att && att.first_entry_time ? new Date(att.first_entry_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
     const lastExit = att && att.last_exit_time ? new Date(att.last_exit_time).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
-    const hoursWorked = att ? (att.total_minutes_worked / 60).toFixed(2) : '0.00';
     const lateMins = att ? (att.total_minutes_late || 0) : 0;
     const status = att ? att.status : 'ABSENT';
+
+    // Desglose legal de horas de trabajo (D.L. 854 / MYPE Micro)
+    let totalWorkedHours = 0;
+    let regularHours = 0;
+    let overtime25Hours = 0;
+    let overtime35Hours = 0;
+
+    if (att && att.first_entry_time && att.last_exit_time) {
+      const entryMs = new Date(att.first_entry_time).getTime();
+      let exitMs = new Date(att.last_exit_time).getTime();
+      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+      const grossMinutes = Math.max(0, Math.floor((exitMs - entryMs) / (1000 * 60)));
+      const effMinutes = Math.max(0, grossMinutes - 60); // Descuento 1h refrigerio
+      totalWorkedHours = Number((effMinutes / 60).toFixed(2));
+      regularHours = Number(Math.min(8.00, totalWorkedHours).toFixed(2));
+      const excess = Math.max(0, totalWorkedHours - 8.00);
+      overtime25Hours = Number(Math.min(2.00, excess).toFixed(2));
+      overtime35Hours = Number(Math.max(0, totalWorkedHours - 10.00).toFixed(2));
+    } else if (att && (att.status === 'PRESENT' || att.status === 'PUNTUAL' || att.status === 'COMPLETED')) {
+      // Jornada estándar completa trabajada (11.5h - 1h refrigerio = 10.50h computable)
+      totalWorkedHours = 10.50;
+      regularHours = 8.00;
+      overtime25Hours = 2.00;
+      overtime35Hours = 0.50;
+    } else if (att && att.total_minutes_worked > 0) {
+      const gross = att.total_minutes_worked / 60;
+      totalWorkedHours = Number(Math.max(0, gross - 1.00).toFixed(2));
+      regularHours = Number(Math.min(8.00, totalWorkedHours).toFixed(2));
+      const excess = Math.max(0, totalWorkedHours - 8.00);
+      overtime25Hours = Number(Math.min(2.00, excess).toFixed(2));
+      overtime35Hours = Number(Math.max(0, totalWorkedHours - 10.00).toFixed(2));
+    }
 
     return {
       id: emp.id,
@@ -451,9 +646,14 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
       area,
       position: emp.position_name || 'OPERARIO DE PRODUCCIÓN',
       branch: 'PECEPE S.A.C.',
+      shiftName,
       firstEntry,
       lastExit,
-      hoursWorked,
+      hoursWorked: totalWorkedHours.toFixed(2),
+      totalWorkedHours,
+      regularHours,
+      overtime25Hours,
+      overtime35Hours,
       lateMins,
       status
     };
@@ -522,9 +722,13 @@ async function handleDailyExportExcel() {
         { name: 'Código ID', width: 14 },
         { name: 'Apellidos y Nombres', width: 38 },
         { name: 'Cargo / Puesto', width: 30 },
+        { name: 'Turno Asignado', width: 28 },
         { name: 'Hora Ingreso', width: 15 },
         { name: 'Hora Salida', width: 15 },
-        { name: 'Horas Trabajadas', width: 18 },
+        { name: 'Total Horas Trabajadas', width: 22 },
+        { name: 'Horas Ordinarias', width: 18 },
+        { name: 'Horas Extras 25%', width: 18 },
+        { name: 'Horas Extras 35%', width: 18 },
         { name: 'Tardanza (Min)', width: 16 },
         { name: 'Estado Asistencia', width: 18 }
       ];
@@ -539,46 +743,90 @@ async function handleDailyExportExcel() {
         item.code,
         item.fullName,
         item.position,
+        item.shiftName,
         item.firstEntry,
         item.lastExit,
-        Number(item.hoursWorked),
+        Number(item.totalWorkedHours.toFixed(2)),
+        Number(item.regularHours.toFixed(2)),
+        Number(item.overtime25Hours.toFixed(2)),
+        Number(item.overtime35Hours.toFixed(2)),
         item.lateMins,
         item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
       ]);
 
-      worksheet.addTable({
-        name: 'TablaAsistenciaDiaria',
-        ref: 'A1',
-        headerRow: true,
-        totalsRow: false,
-        style: {
-          theme: 'TableStyleMedium9', // Tema Azul Institucional de Tabla Excel
-          showRowStripes: true,
-        },
-        columns: columns.map(c => ({ name: c.name, filterButton: true })),
-        rows: rows
-      });
+      // Fila de inicio de datos
+      worksheet.addRow(columns.map(c => c.name));
+      const startRow = 2;
+      rows.forEach(r => worksheet.addRow(r));
+      const endRow = startRow + rows.length - 1;
+
+      // Fila de Totales Generales con Fórmulas Nativas SUM de Excel
+      const totalRow = worksheet.addRow([
+        '',
+        'TOTALES GENERALES',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        { formula: `SUM(M${startRow}:M${endRow})` }, // Suma Total Horas Trabajadas
+        { formula: `SUM(N${startRow}:N${endRow})` }, // Suma Horas Ordinarias
+        { formula: `SUM(O${startRow}:O${endRow})` }, // Suma Horas Extras 25%
+        { formula: `SUM(P${startRow}:P${endRow})` }, // Suma Horas Extras 35%
+        { formula: `SUM(Q${startRow}:Q${endRow})` }, // Suma Tardanzas
+        ''
+      ]);
 
       columns.forEach((c, i) => {
         worksheet.getColumn(i + 1).width = c.width;
       });
 
       worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-        row.height = rowNumber === 1 ? 24 : 20;
+        row.height = rowNumber === 1 ? 26 : (rowNumber === endRow + 1 ? 24 : 20);
 
         row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-          // Tamaño de letra 11 obligatorio
-          cell.font = {
-            name: 'Calibri',
-            size: 11,
-            bold: rowNumber === 1,
-            color: rowNumber === 1 ? { argb: 'FFFFFFFF' } : { argb: 'FF0F172A' }
-          };
+          // Encabezado
+          if (rowNumber === 1) {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber >= 13 && colNumber <= 17 ? 'right' : 'center' };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+              bottom: { style: 'medium', color: { argb: 'FF475569' } },
+              left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+              right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+            };
+            return;
+          }
 
-          const isLeftAlign = colNumber === 4 || colNumber === 8 || colNumber === 9; // Área, Nombres, Cargo
+          // Fila de Totales Generales
+          if (rowNumber === endRow + 1) {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+              bottom: { style: 'double', color: { argb: 'FFFFFFFF' } }
+            };
+            if (colNumber >= 13 && colNumber <= 17) {
+              cell.numFmt = '0.00';
+              cell.alignment = { vertical: 'middle', horizontal: 'right' };
+            } else if (colNumber === 2) {
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+            return;
+          }
+
+          // Filas de Datos
+          cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
+          const isLeftAlign = colNumber === 4 || colNumber === 8 || colNumber === 9 || colNumber === 10;
           cell.alignment = {
             vertical: 'middle',
-            horizontal: isLeftAlign ? 'left' : 'center',
+            horizontal: (colNumber >= 13 && colNumber <= 17) ? 'right' : (isLeftAlign ? 'left' : 'center'),
             wrapText: false
           };
 
@@ -589,7 +837,15 @@ async function handleDailyExportExcel() {
             right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
           };
 
-          if (rowNumber > 1 && colNumber === 14) {
+          // Formato numérico decimal puro (0.00)
+          if (colNumber >= 13 && colNumber <= 16) {
+            cell.numFmt = '0.00';
+            if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
+            if (colNumber === 15) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
+            if (colNumber === 16) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
+          }
+
+          if (colNumber === 18) {
             const val = String(cell.value || '');
             if (val === 'PUNTUAL') {
               cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
@@ -611,27 +867,60 @@ async function handleDailyExportExcel() {
       link.click();
       window.URL.revokeObjectURL(downloadUrl);
 
-      showToast('¡Excel en formato tabla (Tamaño 11) descargado exitosamente!', 'success');
+      showToast('¡Excel en formato tabla con horas extras descargado exitosamente!', 'success');
       return;
     }
 
     // Fallback con SheetJS
-    const exportRows = list.map((item, index) => ({
-      'N°': index + 1,
-      'Fecha': dateInput,
-      'Planta': item.branch,
-      'Área': item.area,
-      'Tipo Doc': item.docType,
-      'N° Documento': item.docNumber,
-      'Código ID': item.code,
-      'Apellidos y Nombres': item.fullName,
-      'Cargo / Puesto': item.position,
-      'Hora Ingreso': item.firstEntry,
-      'Hora Salida': item.lastExit,
-      'Horas Trabajadas': Number(item.hoursWorked),
-      'Tardanza (Min)': item.lateMins,
-      'Estado Asistencia': item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
-    }));
+    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0;
+    const exportRows = list.map((item, index) => {
+      sumTot += item.totalWorkedHours;
+      sumOrd += item.regularHours;
+      sum25 += item.overtime25Hours;
+      sum35 += item.overtime35Hours;
+      return {
+        'N°': index + 1,
+        'Fecha': dateInput,
+        'Planta': item.branch,
+        'Área': item.area,
+        'Tipo Doc': item.docType,
+        'N° Documento': item.docNumber,
+        'Código ID': item.code,
+        'Apellidos y Nombres': item.fullName,
+        'Cargo / Puesto': item.position,
+        'Turno Asignado': item.shiftName,
+        'Hora Ingreso': item.firstEntry,
+        'Hora Salida': item.lastExit,
+        'Total Horas Trabajadas': Number(item.totalWorkedHours.toFixed(2)),
+        'Horas Ordinarias': Number(item.regularHours.toFixed(2)),
+        'Horas Extras 25%': Number(item.overtime25Hours.toFixed(2)),
+        'Horas Extras 35%': Number(item.overtime35Hours.toFixed(2)),
+        'Tardanza (Min)': item.lateMins,
+        'Estado Asistencia': item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : 'FALTA')
+      };
+    });
+
+    // Fila de totales generales
+    exportRows.push({
+      'N°': '',
+      'Fecha': 'TOTALES GENERALES',
+      'Planta': '',
+      'Área': '',
+      'Tipo Doc': '',
+      'N° Documento': '',
+      'Código ID': '',
+      'Apellidos y Nombres': '',
+      'Cargo / Puesto': '',
+      'Turno Asignado': '',
+      'Hora Ingreso': '',
+      'Hora Salida': '',
+      'Total Horas Trabajadas': Number(sumTot.toFixed(2)),
+      'Horas Ordinarias': Number(sumOrd.toFixed(2)),
+      'Horas Extras 25%': Number(sum25.toFixed(2)),
+      'Horas Extras 35%': Number(sum35.toFixed(2)),
+      'Tardanza (Min)': '',
+      'Estado Asistencia': ''
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();

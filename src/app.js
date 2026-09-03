@@ -30,8 +30,19 @@ if (config.nodeEnv !== 'test') {
   app.use(morgan('dev'));
 }
 
+// Desactivar caché del navegador para asegurar entrega inmediata de scripts actualizados
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // Servir archivos estáticos (Frontend y subidas)
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../public'), {
+  etag: false,
+  maxAge: 0
+}));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Rutas directas limpias para el portal del trabajador

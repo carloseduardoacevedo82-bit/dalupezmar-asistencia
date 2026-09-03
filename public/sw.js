@@ -1,11 +1,11 @@
-const CACHE_NAME = 'dalupezmar-cache-v5.0';
+const CACHE_NAME = 'dalupezmar-cache-v7.0';
 const ASSETS_TO_CACHE = [
   '/',
   '/app.html',
   '/index.html',
-  '/css/styles.css?v=5.0',
-  '/js/api.js',
-  '/js/auth.js?v=5.0',
+  '/css/styles.css?v=7.0',
+  '/js/api.js?v=7.0',
+  '/js/auth.js?v=7.0',
   '/manifest.json'
 ];
 
@@ -35,11 +35,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
+  // Siempre red primero con no-cache para asegurar la última versión en vivo
   event.respondWith(
-    fetch(event.request).then((response) => {
-      return response;
-    }).catch(() => {
-      return caches.match(event.request);
-    })
+    fetch(event.request)
+      .then((response) => {
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });

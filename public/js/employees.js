@@ -95,7 +95,15 @@ async function loadCatalogs() {
       populateSelect('emp-branch', catalogs.branches, 'id', 'name');
       populateSelect('emp-department', catalogs.departments, 'id', 'name');
       populateSelect('emp-position', catalogs.positions, 'id', 'name');
-      populateSelect('emp-shift', catalogs.shifts, 'id', (s) => `${s.name} (${s.entry_time.slice(0,5)} - ${s.exit_time.slice(0,5)})`);
+      
+      // Normalización estricta de selector de turnos DALUPEZMAR
+      const shiftSelect = document.getElementById('shiftType') || document.getElementById('emp-shift');
+      if (shiftSelect) {
+        shiftSelect.innerHTML = `
+          <option value="diurno">Diurno (07:30 - 19:00)</option>
+          <option value="nocturno">Nocturno (19:30 - 07:00)</option>
+        `;
+      }
     }
   } catch (error) {
     console.error('Error al cargar catálogos:', error);
@@ -563,7 +571,11 @@ window.openEmployeeModal = function(empId = null) {
     document.getElementById('emp-branch').value = emp.branch_id || 1;
     document.getElementById('emp-department').value = emp.department_id || 1;
     document.getElementById('emp-position').value = emp.position_id || 1;
-    document.getElementById('emp-shift').value = emp.shift_id || 1;
+    const shiftInput = document.getElementById('shiftType') || document.getElementById('emp-shift');
+    if (shiftInput) {
+      const isNight = String(emp.shift_name || emp.shift_type || emp.shiftType || '').toLowerCase().includes('noct') || String(emp.shift_id) === '2';
+      shiftInput.value = isNight ? 'nocturno' : 'diurno';
+    }
     document.getElementById('emp-work-mode').value = emp.work_mode || 'PRESENTIAL';
     document.getElementById('emp-emergency-name').value = emp.emergency_contact_name || '';
     document.getElementById('emp-emergency-phone').value = emp.emergency_contact_phone || '';
@@ -576,6 +588,8 @@ window.openEmployeeModal = function(empId = null) {
     document.getElementById('emp-doc-type').value = 'DNI';
     document.getElementById('emp-branch').value = '1'; // PECEPE S.A.C.
     document.getElementById('emp-blood-type').value = 'O+';
+    const shiftInput = document.getElementById('shiftType') || document.getElementById('emp-shift');
+    if (shiftInput) shiftInput.value = 'diurno';
 
     if (previewImg) previewImg.src = DEFAULT_AVATAR;
     if (statusEl) statusEl.textContent = 'Foto predeterminada';
@@ -605,7 +619,12 @@ async function handleEmployeeFormSubmit(e) {
   formData.append('branch_id', document.getElementById('emp-branch').value);
   formData.append('department_id', document.getElementById('emp-department').value);
   formData.append('position_id', document.getElementById('emp-position').value);
-  formData.append('shift_id', document.getElementById('emp-shift').value);
+  const selectedShiftVal = (document.getElementById('shiftType') || document.getElementById('emp-shift')).value;
+  const isNight = String(selectedShiftVal) === '2' || String(selectedShiftVal).toLowerCase().includes('noct');
+  formData.append('shift_id', isNight ? '2' : '1');
+  formData.append('shiftType', isNight ? 'nocturno' : 'diurno');
+  formData.append('shift_type', isNight ? 'nocturno' : 'diurno');
+  formData.append('turno', isNight ? 'nocturno' : 'diurno');
   formData.append('work_mode', document.getElementById('emp-work-mode').value);
   formData.append('emergency_contact_name', document.getElementById('emp-emergency-name').value.trim());
   formData.append('emergency_contact_phone', document.getElementById('emp-emergency-phone').value.trim());

@@ -295,24 +295,32 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=5.1"></script>
-  <script src="/js/auth.js?v=5.1"></script>
+  <script src="/js/api.js?v=7.0"></script>
+  <script src="/js/auth.js?v=7.0"></script>
   <script>
     // Prevenir anidamiento accidental dentro de iframes
     if (window.self !== window.top) {
       window.top.location.href = '/app.html';
     }
 
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (const registration of registrations) {
+          registration.update();
+        }
+      });
+    }
+
     lucide.createIcons();
 
     const MODULE_ROUTES = {
-      dashboard: '/dashboard.html',
-      employees: '/employees.html',
-      badges: '/badge-designer.html',
-      reports: '/reports.html',
-      branches: '/branches.html',
-      users: '/users.html',
-      kiosk: '/kiosk.html'
+      dashboard: '/dashboard.html?v=7.0',
+      employees: '/employees.html?v=7.0',
+      badges: '/badge-designer.html?v=7.0',
+      reports: '/reports.html?v=7.0',
+      branches: '/branches.html?v=7.0',
+      users: '/users.html?v=7.0',
+      kiosk: '/kiosk.html?v=7.0'
     };
 
     const MODULE_TITLES = {

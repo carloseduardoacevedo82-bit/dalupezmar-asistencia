@@ -221,7 +221,10 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Turno de Horario *</label>
-            <select id="emp-shift" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500"></select>
+            <select id="shiftType" name="shiftType" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+              <option value="diurno" selected>Diurno (07:30 - 19:00)</option>
+              <option value="nocturno">Nocturno (19:30 - 07:00)</option>
+            </select>
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Modalidad de Trabajo *</label>
@@ -363,9 +366,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=5.1"></script>
-  <script src="/js/auth.js?v=5.1"></script>
-  <script src="/js/employees.js?v=5.1"></script>
+  <script src="/js/api.js?v=7.0"></script>
+  <script src="/js/auth.js?v=7.0"></script>
+  <script src="/js/employees.js?v=7.0"></script>
   <script>
     lucide.createIcons();
   </script>

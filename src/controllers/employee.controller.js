@@ -182,15 +182,26 @@ const createEmployee = async (req, res) => {
 
     const photoUrl = req.file ? `/uploads/photos/${req.file.filename}` : '/uploads/photos/default-avatar.png';
 
+    // Normalizar turno (Diurno / Nocturno)
+    let finalShiftType = req.body.shiftType || req.body.shift_type || req.body.turno;
+    let finalShiftId = Number(shift_id) || 1;
+    if (finalShiftType === 'nocturno' || finalShiftId === 2 || String(req.body.shift_id) === 'nocturno') {
+      finalShiftId = 2;
+      finalShiftType = 'nocturno';
+    } else {
+      finalShiftId = 1;
+      finalShiftType = 'diurno';
+    }
+
     // Insertar empleado y emitir credencial dentro de transacción
     const createdInfo = await db.transaction(async (client) => {
       const insertEmpRes = await client.query(`
         INSERT INTO employees (
           employee_code, document_type, document_number, first_name, last_name,
           email, phone, emergency_contact_name, emergency_contact_phone, blood_type,
-          birth_date, hire_date, branch_id, department_id, position_id, shift_id,
+          birth_date, hire_date, branch_id, department_id, position_id, shift_id, shift_type,
           photo_url, work_mode, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'ACTIVE')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'ACTIVE')
         RETURNING id, employee_code, document_number;
       `, [
         finalEmpCode,
@@ -208,7 +219,8 @@ const createEmployee = async (req, res) => {
         Number(branch_id),
         Number(department_id),
         Number(position_id),
-        Number(shift_id),
+        finalShiftId,
+        finalShiftType,
         photoUrl,
         work_mode
       ]);
@@ -299,20 +311,31 @@ const updateEmployee = async (req, res) => {
       photoUrl = `/uploads/photos/${req.file.filename}`;
     }
 
+    // Normalizar turno (Diurno / Nocturno)
+    let finalShiftType = req.body.shiftType || req.body.shift_type || req.body.turno || existing.shift_type;
+    let finalShiftId = Number(shift_id) || existing.shift_id || 1;
+    if (finalShiftType === 'nocturno' || finalShiftId === 2 || String(req.body.shift_id) === 'nocturno') {
+      finalShiftId = 2;
+      finalShiftType = 'nocturno';
+    } else {
+      finalShiftId = 1;
+      finalShiftType = 'diurno';
+    }
+
     await db.transaction(async (client) => {
       await client.query(`
         UPDATE employees SET
           document_type = $1, first_name = $2, last_name = $3, document_number = $4, email = $5, phone = $6,
           emergency_contact_name = $7, emergency_contact_phone = $8, blood_type = $9,
           birth_date = $10, branch_id = $11, department_id = $12, position_id = $13,
-          shift_id = $14, photo_url = $15, work_mode = $16, status = $17,
+          shift_id = $14, shift_type = $15, photo_url = $16, work_mode = $17, status = $18,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $18
+        WHERE id = $19
       `, [
         document_type, first_name, last_name, document_number, email, phone,
         emergency_contact_name, emergency_contact_phone, blood_type,
         birth_date, Number(branch_id), Number(department_id), Number(finalPositionId),
-        Number(shift_id), photoUrl, work_mode, status, id
+        finalShiftId, finalShiftType, photoUrl, work_mode, status, id
       ]);
 
       // Actualizar código de barras y estado en badge
@@ -340,13 +363,17 @@ const getCatalogs = async (req, res) => {
     const branches = await db.query("SELECT * FROM branches WHERE is_active = 1 ORDER BY CASE WHEN UPPER(name) LIKE '%PLANTA%' THEN 0 ELSE 1 END, name ASC");
     const departments = await db.query("SELECT * FROM departments WHERE is_active = 1 ORDER BY CASE WHEN UPPER(name) LIKE '%PRODUCCI%' THEN 0 ELSE 1 END, name ASC");
     const positions = await db.query("SELECT * FROM positions WHERE is_active = 1 ORDER BY CASE WHEN UPPER(name) LIKE '%OPERARIO%' THEN 0 WHEN UPPER(name) LIKE '%TROQUELADO%' THEN 1 WHEN UPPER(name) LIKE '%AREA EXTERIOR%' THEN 2 WHEN UPPER(name) LIKE '%SUPERVIS%' THEN 3 ELSE 4 END, name ASC");
-    const shifts = await db.query('SELECT * FROM shifts WHERE is_active = 1 ORDER BY name ASC');
+    const shifts = await db.query("SELECT * FROM shifts WHERE is_active = 1 AND code IN ('diurno', 'nocturno') ORDER BY id ASC");
+    const shiftsList = shifts.rows.length > 0 ? shifts.rows : [
+      { id: 1, code: 'diurno', name: 'Diurno (07:30 - 19:00)', entry_time: '07:30:00', exit_time: '19:00:00' },
+      { id: 2, code: 'nocturno', name: 'Nocturno (19:30 - 07:00)', entry_time: '19:30:00', exit_time: '07:00:00' }
+    ];
 
     return successResponse(res, 'Catálogos del sistema.', {
       branches: branches.rows,
       departments: departments.rows,
       positions: positions.rows,
-      shifts: shifts.rows
+      shifts: shiftsList
     });
   } catch (error) {
     return errorResponse(res, 'Error al recuperar catálogos.', error.message);

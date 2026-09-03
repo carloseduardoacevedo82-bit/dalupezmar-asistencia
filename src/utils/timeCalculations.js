@@ -118,6 +118,60 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
   return Math.round(R * c);
 }
 
+/**
+ * Motor oficial de cálculo de jornada según normativa peruana (D.L. 854 / MYPE Micro):
+ * 1. Cruce de medianoche si exit < entry o turno nocturno.
+ * 2. Descuento automático de 1 hora de refrigerio (60 minutos).
+ * 3. Base Ordinaria: hasta 8.00 horas.
+ * 4. HE 25%: Primeras 2 horas que excedan la jornada (8.01 a 10.00 horas).
+ * 5. HE 35%: Exceso sobre las 10.00 horas.
+ */
+function calculateShiftWorkMetrics(entryDate, exitDate, shiftType = 'diurno', lunchMinutes = 60) {
+  if (!entryDate || !exitDate) {
+    return {
+      totalWorkedHours: 0,
+      regularHours: 0,
+      overtime25Hours: 0,
+      overtime35Hours: 0,
+      grossHours: 0
+    };
+  }
+
+  let entryMs = new Date(entryDate).getTime();
+  let exitMs = new Date(exitDate).getTime();
+
+  // Si exit <= entry, sumar 24h por cruce de medianoche
+  if (exitMs <= entryMs) {
+    exitMs += 24 * 60 * 60 * 1000;
+  }
+
+  const grossMinutes = Math.max(0, Math.floor((exitMs - entryMs) / (1000 * 60)));
+  const effectiveMinutes = Math.max(0, grossMinutes - lunchMinutes);
+
+  const grossHours = Number((grossMinutes / 60).toFixed(2));
+  const totalWorkedHours = Number((effectiveMinutes / 60).toFixed(2));
+
+  // 1. Horas ordinarias base (máx 8.00h)
+  const regularHours = Number(Math.min(8.00, totalWorkedHours).toFixed(2));
+
+  // 2. Sobretiempo sobre 8h
+  const excess = Math.max(0, totalWorkedHours - 8.00);
+
+  // 3. HE 25% (primeras 2 horas: 8.01 a 10.00)
+  const overtime25Hours = Number(Math.min(2.00, excess).toFixed(2));
+
+  // 4. HE 35% (a partir de la 10ª hora)
+  const overtime35Hours = Number(Math.max(0, totalWorkedHours - 10.00).toFixed(2));
+
+  return {
+    grossHours,
+    totalWorkedHours,
+    regularHours,
+    overtime25Hours,
+    overtime35Hours
+  };
+}
+
 module.exports = {
   PERU_TIMEZONE,
   getPeruDateString,
@@ -128,5 +182,6 @@ module.exports = {
   calculateTardiness,
   calculateWorkedMinutes,
   calculateOvertime,
+  calculateShiftWorkMetrics,
   calculateDistanceMeters
 };
