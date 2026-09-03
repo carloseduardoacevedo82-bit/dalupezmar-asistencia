@@ -3,12 +3,10 @@
  */
 let reportData = [];
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   initReportDates();
-  await loadDepartmentsFilter();
-  await executeReportQuery();
-  initAttendanceModals();
 
+  // Vinculación INMEDIATA de botones de exportación y acciones
   document.getElementById('btn-query-report')?.addEventListener('click', executeReportQuery);
   document.getElementById('btn-export-excel')?.addEventListener('click', exportToExcel);
   document.getElementById('btn-export-csv')?.addEventListener('click', exportToCsv);
@@ -17,6 +15,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Botones de reporte diario por áreas
   document.getElementById('btn-daily-export-excel')?.addEventListener('click', handleDailyExportExcel);
   document.getElementById('btn-daily-export-pdf')?.addEventListener('click', handleDailyExportPdf);
+
+  initAttendanceModals();
+
+  // Cargas iniciales asíncronas independientes
+  loadDepartmentsFilter().catch(e => console.error('Error cargando departamentos:', e));
+  executeReportQuery().catch(e => console.error('Error consulta inicial:', e));
 });
 
 function formatLocalYMD(d = new Date()) {
@@ -179,9 +183,12 @@ function calculateTotals(data) {
 }
 
 /**
- * Exportar a Excel (.xlsx) con Formato de Tabla y Fuente async function exportToExcel() {
+ * Exportar a Excel (.xlsx) con Formato de Tabla y Fuente
+ */
+async function exportToExcel() {
   await handleDailyExportExcel();
 }
+window.exportToExcel = exportToExcel;
 
 /**
  * Exportar a CSV con las 16 columnas canónicas de Asistencia y Totales
@@ -289,6 +296,7 @@ async function exportToCsv() {
     showToast('Error al exportar CSV: ' + error.message, 'error');
   }
 }
+window.exportToCsv = exportToCsv;
 
 /**
  * =========================================================================
@@ -697,6 +705,7 @@ async function handleDailyExportExcel() {
     showToast('Error al exportar Excel: ' + error.message, 'error');
   }
 }
+window.handleDailyExportExcel = handleDailyExportExcel;
 
 /**
  * Descargar / Imprimir Reporte PDF Oficial de Asistencia Diaria en Orientación Horizontal (Landscape)
@@ -867,6 +876,7 @@ async function handleDailyExportPdf() {
     showToast('Error al generar PDF: ' + error.message, 'error');
   }
 }
+window.handleDailyExportPdf = handleDailyExportPdf;
 
 /**
  * ============================================================================

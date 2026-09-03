@@ -89,10 +89,10 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-          <button id="btn-daily-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition active:scale-95">
+          <button id="btn-daily-export-excel" onclick="handleDailyExportExcel()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Excel Diario (.xlsx)
           </button>
-          <button id="btn-daily-export-pdf" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition active:scale-95">
+          <button id="btn-daily-export-pdf" onclick="handleDailyExportPdf()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
             <i data-lucide="file-text" class="w-4 h-4"></i> Descargar / Imprimir PDF Diario
           </button>
         </div>
@@ -218,13 +218,13 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button id="btn-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition">
+        <button id="btn-export-excel" onclick="exportToExcel()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
           <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar a Excel (.xlsx)
         </button>
-        <button id="btn-export-csv" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
+        <button id="btn-export-csv" onclick="exportToCsv()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer active:scale-95">
           <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i> Exportar CSV
         </button>
-        <button id="btn-print-report" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
+        <button id="btn-print-report" onclick="handleDailyExportPdf()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer active:scale-95">
           <i data-lucide="printer" class="w-4 h-4 text-purple-400"></i> Imprimir Reporte
         </button>
       </div>
@@ -380,10 +380,10 @@
   <div id="print-attendance-sheet" class="hidden"></div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=8.0"></script>
-  <script src="/js/auth.js?v=8.0"></script>
+  <script src="/js/api.js?v=8.2"></script>
+  <script src="/js/auth.js?v=8.2"></script>
   <script src="/js/exceljs.min.js"></script>
-  <script src="/js/reports.js?v=8.0"></script>
+  <script src="/js/reports.js?v=8.2"></script>
   <script>
     lucide.createIcons();
   </script>
