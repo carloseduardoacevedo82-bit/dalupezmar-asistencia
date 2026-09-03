@@ -191,23 +191,25 @@ async function exportToExcel() {
 window.exportToExcel = exportToExcel;
 
 /**
- * Exportar a CSV con las 16 columnas canónicas de Asistencia y Totales
+ * Exportar a CSV con las 9 columnas oficiales de Asistencia Diaria y Totales
  */
 async function exportToCsv() {
   const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
   const areaSelect = document.getElementById('daily-rep-area')?.value || '';
+  const shiftSelect = document.getElementById('daily-rep-shift')?.value || '';
 
   showToast('Generando archivo CSV oficial...', 'info');
 
   try {
-    const list = await fetchDailyAttendanceData(dateInput, areaSelect);
+    const list = await fetchDailyAttendanceData(dateInput, areaSelect, shiftSelect);
     if (list.length === 0) {
-      showToast('No hay datos para exportar.', 'warning');
+      showToast('No hay datos para exportar con los filtros seleccionados.', 'warning');
       return;
     }
 
     const areaTag = areaSelect ? `_${areaSelect.replace(/\s+/g, '_')}` : '_Todas_Areas';
-    const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}.csv`;
+    const shiftTag = shiftSelect ? (shiftSelect === 'nocturno' ? '_Turno_Nocturno' : '_Turno_Diurno') : '_Todos_Turnos';
+    const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}${shiftTag}.csv`;
 
     const headers = [
       'Planta',
@@ -218,27 +220,15 @@ async function exportToCsv() {
       'Apellidos y Nombres',
       'Cargo / Puesto',
       'Turno Asignado',
-      'Hora Ingreso',
-      'Hora Salida',
-      'Total Horas Trabajadas',
-      'Horas Ordinarias',
-      'Horas Extras 25%',
-      'Horas Extras 35%',
-      'Tardanza (Min)',
       'Estado Asistencia'
     ];
 
-    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
+    let countAsistio = 0, countNoAsistio = 0;
     const csvRows = [headers.join(',')];
 
     list.forEach(item => {
-      sumTot += item.totalWorkedHours;
-      sumOrd += item.regularHours;
-      sum25 += item.overtime25Hours;
-      sum35 += item.overtime35Hours;
-      sumLate += item.lateMins;
-
-      const statusText = item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'));
+      if (item.estadoAsistencia === 'ASISTIO') countAsistio++;
+      else countNoAsistio++;
 
       const row = [
         `"${item.branch}"`,
@@ -249,14 +239,7 @@ async function exportToCsv() {
         `"${item.fullName}"`,
         `"${item.position}"`,
         `"${item.shiftName}"`,
-        item.firstEntry,
-        item.lastExit,
-        item.totalWorkedHours.toFixed(2),
-        item.regularHours.toFixed(2),
-        item.overtime25Hours.toFixed(2),
-        item.overtime35Hours.toFixed(2),
-        item.lateMins,
-        statusText
+        item.estadoAsistencia
       ];
       csvRows.push(row.join(','));
     });
@@ -270,15 +253,8 @@ async function exportToCsv() {
       '""',
       '""',
       '""',
-      '""',
-      '""',
-      '""',
-      sumTot.toFixed(2),
-      sumOrd.toFixed(2),
-      sum25.toFixed(2),
-      sum35.toFixed(2),
-      sumLate,
-      '""'
+      `"Total: ${list.length}"`,
+      `"ASISTIERON: ${countAsistio} | NO ASISTIERON: ${countNoAsistio}"`
     ].join(','));
 
     const blob = new Blob(["\uFEFF" + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
@@ -352,7 +328,7 @@ function getAreaHierarchyRank(posName, deptName) {
  * Obtener lista consolidada del personal para el reporte diario
  * (Excluye automáticamente a Gerencia General y Supervisores Generales)
  */
-async function fetchDailyAttendanceData(dateStr, selectedArea) {
+async function fetchDailyAttendanceData(dateStr, selectedArea, selectedShift) {
   // 1. Obtener todos los colaboradores activos (fresco desde BD) y EXCLUIR Gerencia General y Supervisores
   const empRes = await api.employees.getAll({ _t: Date.now() });
   const allEmployees = (empRes && empRes.data) 
@@ -386,37 +362,16 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
     const lateMins = att ? (att.total_minutes_late || 0) : 0;
     const status = att ? att.status : 'ABSENT';
 
-    // Desglose legal de horas de trabajo (D.L. 854 / MYPE Micro)
-    let totalWorkedHours = 0;
-    let regularHours = 0;
-    let overtime25Hours = 0;
-    let overtime35Hours = 0;
-
-    if (att && att.first_entry_time && att.last_exit_time) {
-      const entryMs = new Date(att.first_entry_time).getTime();
-      let exitMs = new Date(att.last_exit_time).getTime();
-      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
-      const grossMinutes = Math.max(0, Math.floor((exitMs - entryMs) / (1000 * 60)));
-      const effMinutes = Math.max(0, grossMinutes - 60); // Descuento 1h refrigerio
-      totalWorkedHours = Number((effMinutes / 60).toFixed(2));
-      regularHours = Number(Math.min(8.00, totalWorkedHours).toFixed(2));
-      const excess = Math.max(0, totalWorkedHours - 8.00);
-      overtime25Hours = Number(Math.min(2.00, excess).toFixed(2));
-      overtime35Hours = Number(Math.max(0, totalWorkedHours - 10.00).toFixed(2));
-    } else if (att && (att.status === 'PRESENT' || att.status === 'PUNTUAL' || att.status === 'COMPLETED')) {
-      // Jornada estándar completa trabajada (11.5h - 1h refrigerio = 10.50h computable)
-      totalWorkedHours = 10.50;
-      regularHours = 8.00;
-      overtime25Hours = 2.00;
-      overtime35Hours = 0.50;
-    } else if (att && att.total_minutes_worked > 0) {
-      const gross = att.total_minutes_worked / 60;
-      totalWorkedHours = Number(Math.max(0, gross - 1.00).toFixed(2));
-      regularHours = Number(Math.min(8.00, totalWorkedHours).toFixed(2));
-      const excess = Math.max(0, totalWorkedHours - 8.00);
-      overtime25Hours = Number(Math.min(2.00, excess).toFixed(2));
-      overtime35Hours = Number(Math.max(0, totalWorkedHours - 10.00).toFixed(2));
-    }
+    // Determinar con certeza legal y biométrica si asistió o no asistió
+    const hasPunch = att && (
+      Boolean(att.first_entry_time) ||
+      att.status === 'PRESENT' ||
+      att.status === 'PUNTUAL' ||
+      att.status === 'LATE' ||
+      att.status === 'JUSTIFIED' ||
+      (att.total_minutes_worked && att.total_minutes_worked > 0)
+    );
+    const estadoAsistencia = hasPunch ? 'ASISTIO' : 'NO ASISTIO';
 
     return {
       id: emp.id,
@@ -427,14 +382,11 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
       area,
       position: emp.position_name || 'OPERARIO DE PRODUCCIÓN',
       branch: 'PECEPE S.A.C.',
+      isNight,
       shiftName,
+      estadoAsistencia,
       firstEntry,
       lastExit,
-      hoursWorked: totalWorkedHours.toFixed(2),
-      totalWorkedHours,
-      regularHours,
-      overtime25Hours,
-      overtime35Hours,
       lateMins,
       status
     };
@@ -446,6 +398,20 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
       item.area.toLowerCase().includes(selectedArea.toLowerCase()) || 
       item.position.toLowerCase().includes(selectedArea.toLowerCase())
     );
+  }
+
+  // Filtrar por turno si se seleccionó uno ('diurno' o 'nocturno')
+  const shiftFilter = (selectedShift !== undefined && selectedShift !== null && selectedShift !== '') 
+    ? selectedShift 
+    : (document.getElementById('daily-rep-shift')?.value || '');
+
+  if (shiftFilter && shiftFilter.trim() !== '') {
+    const s = shiftFilter.toLowerCase();
+    if (s.includes('noct') || s === '2') {
+      dailyList = dailyList.filter(item => item.isNight);
+    } else if (s.includes('diur') || s === '1') {
+      dailyList = dailyList.filter(item => !item.isNight);
+    }
   }
 
   // 4. Ordenar jerárquicamente por áreas (Troquelado de Anillas -> Operarios) y luego en orden alfabético A-Z
@@ -464,25 +430,30 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
 }
 
 /**
- * Exportar Asistencia Diaria a Excel (.xlsx) con Formato de Tabla y Fuente Tamaño 11
- * Estructura oficial de 16 columnas con Planta al inicio y totales automáticos
+ * Exportar Asistencia Diaria a Excel (.xlsx) con Formato de Tabla Oficial de 9 Columnas
+ * Muestra fielmente el estado ASISTIO / NO ASISTIO y permite filtrar por turnos Diurno y Nocturno
  */
 async function handleDailyExportExcel() {
   const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
   const areaSelect = document.getElementById('daily-rep-area')?.value || '';
+  const shiftSelect = document.getElementById('daily-rep-shift')?.value || '';
 
-  showToast('Generando archivo Excel con formato de tabla...', 'info');
+  showToast('Generando archivo Excel de asistencia...', 'info');
 
   try {
-    const list = await fetchDailyAttendanceData(dateInput, areaSelect);
+    const list = await fetchDailyAttendanceData(dateInput, areaSelect, shiftSelect);
 
     if (list.length === 0) {
-      showToast('No se encontraron trabajadores para el área seleccionada.', 'warning');
+      showToast('No se encontraron trabajadores con los filtros seleccionados.', 'warning');
       return;
     }
 
     const areaTag = areaSelect ? `_${areaSelect.replace(/\s+/g, '_')}` : '_Todas_Areas';
-    const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}.xlsx`;
+    const shiftTag = shiftSelect ? (shiftSelect === 'nocturno' ? '_Turno_Nocturno' : '_Turno_Diurno') : '_Todos_Turnos';
+    const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}${shiftTag}.xlsx`;
+
+    const countAsistio = list.filter(i => i.estadoAsistencia === 'ASISTIO').length;
+    const countNoAsistio = list.filter(i => i.estadoAsistencia === 'NO ASISTIO').length;
 
     // Si ExcelJS está disponible, generar tabla nativa con fuentes Calibri 11 y tema institucional
     if (window.ExcelJS) {
@@ -494,6 +465,7 @@ async function handleDailyExportExcel() {
         views: [{ showGridLines: true }]
       });
 
+      // 9 columnas canónicas
       const columns = [
         { name: 'Planta', width: 16 },
         { name: 'Área', width: 24 },
@@ -502,15 +474,8 @@ async function handleDailyExportExcel() {
         { name: 'Código ID', width: 14 },
         { name: 'Apellidos y Nombres', width: 38 },
         { name: 'Cargo / Puesto', width: 30 },
-        { name: 'Turno Asignado', width: 28 },
-        { name: 'Hora Ingreso', width: 15 },
-        { name: 'Hora Salida', width: 15 },
-        { name: 'Total Horas Trabajadas', width: 22 },
-        { name: 'Horas Ordinarias', width: 18 },
-        { name: 'Horas Extras 25%', width: 18 },
-        { name: 'Horas Extras 35%', width: 18 },
-        { name: 'Tardanza (Min)', width: 16 },
-        { name: 'Estado Asistencia', width: 18 }
+        { name: 'Turno Asignado', width: 26 },
+        { name: 'Estado Asistencia', width: 22 }
       ];
 
       const rows = list.map((item) => [
@@ -522,23 +487,16 @@ async function handleDailyExportExcel() {
         item.fullName,
         item.position,
         item.shiftName,
-        item.firstEntry,
-        item.lastExit,
-        Number(item.totalWorkedHours.toFixed(2)),
-        Number(item.regularHours.toFixed(2)),
-        Number(item.overtime25Hours.toFixed(2)),
-        Number(item.overtime35Hours.toFixed(2)),
-        item.lateMins,
-        item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
+        item.estadoAsistencia
       ]);
 
-      // Fila de inicio de datos
+      // Fila de encabezado
       worksheet.addRow(columns.map(c => c.name));
       const startRow = 2;
       rows.forEach(r => worksheet.addRow(r));
       const endRow = startRow + rows.length - 1;
 
-      // Fila de Totales Generales con Fórmulas Nativas SUM de Excel
+      // Fila de Totales Generales
       const totalRow = worksheet.addRow([
         'TOTALES GENERALES',
         '',
@@ -547,15 +505,8 @@ async function handleDailyExportExcel() {
         '',
         '',
         '',
-        '',
-        '',
-        '',
-        { formula: `SUM(K${startRow}:K${endRow})` }, // Suma Total Horas Trabajadas
-        { formula: `SUM(L${startRow}:L${endRow})` }, // Suma Horas Ordinarias
-        { formula: `SUM(M${startRow}:M${endRow})` }, // Suma Horas Extras 25%
-        { formula: `SUM(N${startRow}:N${endRow})` }, // Suma Horas Extras 35%
-        { formula: `SUM(O${startRow}:O${endRow})` }, // Suma Tardanzas
-        ''
+        `Total: ${list.length}`,
+        `ASISTIERON: ${countAsistio} | NO ASISTIERON: ${countNoAsistio}`
       ]);
 
       columns.forEach((c, i) => {
@@ -569,13 +520,13 @@ async function handleDailyExportExcel() {
           // Encabezado
           if (rowNumber === 1) {
             cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-            cell.alignment = { vertical: 'middle', horizontal: colNumber >= 11 && colNumber <= 15 ? 'right' : 'center' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002855' } };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 2 || colNumber === 6 || colNumber === 7 ? 'left' : 'center' };
             cell.border = {
-              top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-              bottom: { style: 'medium', color: { argb: 'FF475569' } },
-              left: { style: 'thin', color: { argb: 'FF94A3B8' } },
-              right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+              top: { style: 'thin', color: { argb: 'FF334155' } },
+              bottom: { style: 'medium', color: { argb: 'FF002855' } },
+              left: { style: 'thin', color: { argb: 'FF334155' } },
+              right: { style: 'thin', color: { argb: 'FF334155' } }
             };
             return;
           }
@@ -588,11 +539,12 @@ async function handleDailyExportExcel() {
               top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
               bottom: { style: 'double', color: { argb: 'FFFFFFFF' } }
             };
-            if (colNumber >= 11 && colNumber <= 15) {
-              cell.numFmt = '0.00';
-              cell.alignment = { vertical: 'middle', horizontal: 'right' };
-            } else if (colNumber === 1) {
+            if (colNumber === 9) {
               cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (colNumber === 8) {
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (colNumber === 1) {
+              cell.alignment = { vertical: 'middle', horizontal: 'left' };
             }
             return;
           }
@@ -602,7 +554,7 @@ async function handleDailyExportExcel() {
           const isLeftAlign = colNumber === 1 || colNumber === 2 || colNumber === 6 || colNumber === 7;
           cell.alignment = {
             vertical: 'middle',
-            horizontal: (colNumber >= 11 && colNumber <= 15) ? 'right' : (isLeftAlign ? 'left' : 'center'),
+            horizontal: isLeftAlign ? 'left' : 'center',
             wrapText: false
           };
 
@@ -613,22 +565,24 @@ async function handleDailyExportExcel() {
             right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
           };
 
-          // Formato numérico decimal puro (0.00)
-          if (colNumber >= 11 && colNumber <= 14) {
-            cell.numFmt = '0.00';
-            if (colNumber === 11) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
-            if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
-            if (colNumber === 14) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
+          // Columna H: Turno Asignado (Columna 8)
+          if (colNumber === 8) {
+            const isNight = String(cell.value || '').includes('Nocturno') || String(cell.value || '').includes('19:30');
+            cell.font = {
+              name: 'Calibri',
+              size: 11,
+              bold: isNight,
+              color: { argb: isNight ? 'FF6B21A8' : 'FF0369A1' }
+            };
           }
 
-          if (colNumber === 16) {
+          // Columna I: Estado Asistencia (Columna 9)
+          if (colNumber === 9) {
             const val = String(cell.value || '');
-            if (val === 'PUNTUAL') {
-              cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
-            } else if (val === 'TARDANZA') {
-              cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFD97706' } };
-            } else if (val === 'FALTA') {
-              cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFDC2626' } };
+            if (val === 'ASISTIO') {
+              cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } }; // Verde
+            } else {
+              cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFDC2626' } }; // Rojo
             }
           }
         });
@@ -648,32 +602,17 @@ async function handleDailyExportExcel() {
     }
 
     // Fallback con SheetJS
-    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
-    const exportRows = list.map((item) => {
-      sumTot += item.totalWorkedHours;
-      sumOrd += item.regularHours;
-      sum25 += item.overtime25Hours;
-      sum35 += item.overtime35Hours;
-      sumLate += item.lateMins;
-      return {
-        'Planta': item.branch,
-        'Área': item.area,
-        'Tipo Doc': item.docType,
-        'N° Documento': item.docNumber,
-        'Código ID': item.code,
-        'Apellidos y Nombres': item.fullName,
-        'Cargo / Puesto': item.position,
-        'Turno Asignado': item.shiftName,
-        'Hora Ingreso': item.firstEntry,
-        'Hora Salida': item.lastExit,
-        'Total Horas Trabajadas': Number(item.totalWorkedHours.toFixed(2)),
-        'Horas Ordinarias': Number(item.regularHours.toFixed(2)),
-        'Horas Extras 25%': Number(item.overtime25Hours.toFixed(2)),
-        'Horas Extras 35%': Number(item.overtime35Hours.toFixed(2)),
-        'Tardanza (Min)': item.lateMins,
-        'Estado Asistencia': item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : 'FALTA')
-      };
-    });
+    const exportRows = list.map((item) => ({
+      'Planta': item.branch,
+      'Área': item.area,
+      'Tipo Doc': item.docType,
+      'N° Documento': item.docNumber,
+      'Código ID': item.code,
+      'Apellidos y Nombres': item.fullName,
+      'Cargo / Puesto': item.position,
+      'Turno Asignado': item.shiftName,
+      'Estado Asistencia': item.estadoAsistencia
+    }));
 
     // Fila de totales generales
     exportRows.push({
@@ -684,15 +623,8 @@ async function handleDailyExportExcel() {
       'Código ID': '',
       'Apellidos y Nombres': '',
       'Cargo / Puesto': '',
-      'Turno Asignado': '',
-      'Hora Ingreso': '',
-      'Hora Salida': '',
-      'Total Horas Trabajadas': Number(sumTot.toFixed(2)),
-      'Horas Ordinarias': Number(sumOrd.toFixed(2)),
-      'Horas Extras 25%': Number(sum25.toFixed(2)),
-      'Horas Extras 35%': Number(sum35.toFixed(2)),
-      'Tardanza (Min)': sumLate,
-      'Estado Asistencia': ''
+      'Turno Asignado': `Total: ${list.length}`,
+      'Estado Asistencia': `ASISTIERON: ${countAsistio} | NO ASISTIERON: ${countNoAsistio}`
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -709,42 +641,40 @@ window.handleDailyExportExcel = handleDailyExportExcel;
 
 /**
  * Descargar / Imprimir Reporte PDF Oficial de Asistencia Diaria en Orientación Horizontal (Landscape)
- * Garantiza que la información ingrese 100% completa a la hoja sin desbordes.
+ * Estructura limpia de confirmación de asistencia (ASISTIÓ / NO ASISTIÓ) y filtrado por turnos
  */
 async function handleDailyExportPdf() {
   const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
   const areaSelect = document.getElementById('daily-rep-area')?.value || '';
-  const areaTitle = areaSelect ? areaSelect.toUpperCase() : 'TODAS LAS ÁREAS (CONSOLIDADO)';
+  const shiftSelect = document.getElementById('daily-rep-shift')?.value || '';
+  
+  const areaTitle = areaSelect ? areaSelect.toUpperCase() : 'TODAS LAS ÁREAS';
+  const shiftTitle = shiftSelect === 'nocturno' 
+    ? 'TURNO NOCTURNO (19:30 - 07:00)' 
+    : (shiftSelect === 'diurno' ? 'TURNO DIURNO (07:30 - 19:00)' : 'TODOS LOS TURNOS (CONSOLIDADO)');
 
   showToast('Preparando reporte para impresión horizontal / PDF...', 'info');
 
   try {
-    const list = await fetchDailyAttendanceData(dateInput, areaSelect);
+    const list = await fetchDailyAttendanceData(dateInput, areaSelect, shiftSelect);
 
     if (list.length === 0) {
-      showToast('No se encontraron registros de trabajadores.', 'warning');
+      showToast('No se encontraron registros de trabajadores con los filtros seleccionados.', 'warning');
       return;
     }
 
     const totalCount = list.length;
-    const presentCount = list.filter(i => i.status === 'PRESENT').length;
-    const lateCount = list.filter(i => i.status === 'LATE').length;
-    const absentCount = list.filter(i => i.status === 'ABSENT' || !i.status).length;
-
-    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
-    list.forEach(i => {
-      sumTot += i.totalWorkedHours;
-      sumOrd += i.regularHours;
-      sum25 += i.overtime25Hours;
-      sum35 += i.overtime35Hours;
-      sumLate += i.lateMins;
-    });
+    const countAsistio = list.filter(i => i.estadoAsistencia === 'ASISTIO').length;
+    const countNoAsistio = list.filter(i => i.estadoAsistencia === 'NO ASISTIO').length;
+    const percentAsistencia = totalCount > 0 ? ((countAsistio / totalCount) * 100).toFixed(1) : '0.0';
 
     const rowsHtml = list.map((item, index) => {
-      const isNight = item.shiftName.includes('Nocturno') || item.shiftName.includes('19:30');
-      const shiftShort = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
-      const statusText = item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? `TARDANZA (${item.lateMins}m)` : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'));
-      const statusColor = item.status === 'PRESENT' ? '#059669' : (item.status === 'LATE' ? '#d97706' : '#dc2626');
+      const isNight = item.isNight;
+      const shiftShort = isNight ? '🌙 Nocturno (19:30 - 07:00)' : '☀️ Diurno (07:30 - 19:00)';
+      const isAsistio = item.estadoAsistencia === 'ASISTIO';
+      const statusText = isAsistio ? '✔ ASISTIÓ' : '✖ NO ASISTIÓ';
+      const statusColor = isAsistio ? '#059669' : '#dc2626';
+      const statusBg = isAsistio ? '#ecfdf5' : '#fef2f2';
 
       return `
         <tr>
@@ -756,15 +686,8 @@ async function handleDailyExportPdf() {
           <td style="text-align: center; font-family: monospace; font-weight: bold; color: #002855;">${item.code}</td>
           <td style="font-weight: 700; text-transform: uppercase;">${item.fullName}</td>
           <td>${item.position}</td>
-          <td style="text-align: center; font-size: 6.2pt;">${shiftShort}</td>
-          <td style="text-align: center; font-family: monospace;">${item.firstEntry}</td>
-          <td style="text-align: center; font-family: monospace;">${item.lastExit}</td>
-          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #047857;">${item.totalWorkedHours.toFixed(2)}</td>
-          <td style="text-align: right; font-family: monospace;">${item.regularHours.toFixed(2)}</td>
-          <td style="text-align: right; font-family: monospace; color: #b45309; font-weight: bold;">${item.overtime25Hours.toFixed(2)}</td>
-          <td style="text-align: right; font-family: monospace; color: #c2410c; font-weight: bold;">${item.overtime35Hours.toFixed(2)}</td>
-          <td style="text-align: right; font-family: monospace;">${item.lateMins}</td>
-          <td style="text-align: center; font-weight: 800; color: ${statusColor}; font-size: 6.5pt;">${statusText}</td>
+          <td style="text-align: center; font-size: 7pt; font-weight: 600; color: ${isNight ? '#6b21a8' : '#0369a1'};">${shiftShort}</td>
+          <td style="text-align: center; font-weight: 900; color: ${statusColor}; background: ${statusBg}; font-size: 7.5pt;">${statusText}</td>
         </tr>
       `;
     }).join('');
@@ -783,8 +706,8 @@ async function handleDailyExportPdf() {
           <p style="font-size: 6.8pt; color: #475569; margin: 1px 0 0 0; font-weight: bold;">RUC: 20615714128 • PLANTA PRINCIPAL PECEPE S.A.C.</p>
         </div>
         <div style="text-align: center;">
-          <h2 style="font-size: 9.5pt; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase;">PARTE DIARIO CONSOLIDADO DE ASISTENCIA Y HORAS EXTRAS</h2>
-          <p style="font-size: 6.8pt; color: #0284c7; margin: 1px 0 0 0; font-weight: bold;">Área: ${areaTitle} • Jornadas Fijas: Diurno (07:30 - 19:00) / Nocturno (19:30 - 07:00) • 1h Refrigerio Descontada</p>
+          <h2 style="font-size: 9.5pt; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase;">PARTE DIARIO DE ASISTENCIA DE PERSONAL</h2>
+          <p style="font-size: 7pt; color: #0284c7; margin: 1px 0 0 0; font-weight: bold;">Área: ${areaTitle} • Turno: ${shiftTitle}</p>
         </div>
         <div style="text-align: right; font-size: 6.8pt; color: #64748b;">
           <p style="margin: 0;"><b>Fecha Reporte:</b> ${dateInput}</p>
@@ -793,45 +716,38 @@ async function handleDailyExportPdf() {
       </div>
 
       <!-- Tarjetas de Resumen KPI -->
-      <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-        <div style="flex: 1; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; text-align: center;">
-          <span style="font-size: 6.5pt; font-weight: 800; color: #475569; text-transform: uppercase;">Total Personal: </span>
-          <span style="font-size: 8pt; font-weight: 900; color: #002855;">${totalCount}</span>
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <div style="flex: 1; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; text-align: center;">
+          <span style="font-size: 6.8pt; font-weight: 800; color: #475569; text-transform: uppercase;">Total Personal: </span>
+          <span style="font-size: 8.5pt; font-weight: 900; color: #002855;">${totalCount}</span>
         </div>
-        <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 4px; padding: 3px 6px; text-align: center;">
-          <span style="font-size: 6.5pt; font-weight: 800; color: #065f46; text-transform: uppercase;">Puntuales: </span>
-          <span style="font-size: 8pt; font-weight: 900; color: #059669;">${presentCount}</span>
+        <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 4px; padding: 4px 8px; text-align: center;">
+          <span style="font-size: 6.8pt; font-weight: 800; color: #065f46; text-transform: uppercase;">Asistieron: </span>
+          <span style="font-size: 8.5pt; font-weight: 900; color: #059669;">${countAsistio}</span>
         </div>
-        <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 3px 6px; text-align: center;">
-          <span style="font-size: 6.5pt; font-weight: 800; color: #92400e; text-transform: uppercase;">Tardanzas: </span>
-          <span style="font-size: 8pt; font-weight: 900; color: #d97706;">${lateCount}</span>
+        <div style="flex: 1; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; text-align: center;">
+          <span style="font-size: 6.8pt; font-weight: 800; color: #991b1b; text-transform: uppercase;">No Asistieron: </span>
+          <span style="font-size: 8.5pt; font-weight: 900; color: #dc2626;">${countNoAsistio}</span>
         </div>
-        <div style="flex: 1; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 3px 6px; text-align: center;">
-          <span style="font-size: 6.5pt; font-weight: 800; color: #991b1b; text-transform: uppercase;">Faltas: </span>
-          <span style="font-size: 8pt; font-weight: 900; color: #dc2626;">${absentCount}</span>
+        <div style="flex: 1; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; padding: 4px 8px; text-align: center;">
+          <span style="font-size: 6.8pt; font-weight: 800; color: #0369a1; text-transform: uppercase;">% Asistencia: </span>
+          <span style="font-size: 8.5pt; font-weight: 900; color: #0284c7;">${percentAsistencia}%</span>
         </div>
       </div>
 
       <table class="print-table">
         <thead>
           <tr>
-            <th style="width: 2.5%;">#</th>
-            <th style="width: 6%;">Planta</th>
-            <th style="width: 8.5%;">Área</th>
-            <th style="width: 3.5%;">Doc</th>
-            <th style="width: 6.5%;">N° Doc</th>
-            <th style="width: 5.5%;">Código ID</th>
-            <th style="width: 16.5%;">Apellidos y Nombres</th>
-            <th style="width: 11%;">Cargo / Puesto</th>
-            <th style="width: 9.5%;">Turno Asignado</th>
-            <th style="width: 5.5%;">Hora Ingreso</th>
-            <th style="width: 5.5%;">Hora Salida</th>
-            <th style="width: 4.2%;">Total Horas</th>
-            <th style="width: 3.8%;">Horas Ord.</th>
-            <th style="width: 3.8%;">HE 25%</th>
-            <th style="width: 3.8%;">HE 35%</th>
-            <th style="width: 3.5%;">Tard. (Min)</th>
-            <th style="width: 4.7%;">Estado</th>
+            <th style="width: 3%;">#</th>
+            <th style="width: 8%;">Planta</th>
+            <th style="width: 12%;">Área</th>
+            <th style="width: 5%;">Doc</th>
+            <th style="width: 8.5%;">N° Doc</th>
+            <th style="width: 7.5%;">Código ID</th>
+            <th style="width: 25%;">Apellidos y Nombres</th>
+            <th style="width: 15%;">Cargo / Puesto</th>
+            <th style="width: 10%;">Turno Asignado</th>
+            <th style="width: 6%;">Estado</th>
           </tr>
         </thead>
         <tbody>
@@ -839,13 +755,11 @@ async function handleDailyExportPdf() {
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="11" style="text-align: center; font-weight: 900; letter-spacing: 1px;">TOTALES GENERALES</td>
-            <td style="text-align: right; font-family: monospace;">${sumTot.toFixed(2)}</td>
-            <td style="text-align: right; font-family: monospace;">${sumOrd.toFixed(2)}</td>
-            <td style="text-align: right; font-family: monospace;">${sum25.toFixed(2)}</td>
-            <td style="text-align: right; font-family: monospace;">${sum35.toFixed(2)}</td>
-            <td style="text-align: right; font-family: monospace;">${sumLate}</td>
-            <td></td>
+            <td colspan="7" style="text-align: center; font-weight: 900; letter-spacing: 1px;">TOTALES GENERALES</td>
+            <td style="text-align: center; font-weight: bold;">Total: ${totalCount}</td>
+            <td colspan="2" style="text-align: center; font-weight: 900;">
+              <span style="color: #10b981;">ASISTIERON: ${countAsistio}</span> &nbsp;|&nbsp; <span style="color: #ef4444;">NO ASISTIERON: ${countNoAsistio}</span>
+            </td>
           </tr>
         </tfoot>
       </table>
@@ -853,7 +767,7 @@ async function handleDailyExportPdf() {
       <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 6.8pt; color: #475569; page-break-inside: avoid;">
         <div>
           <p style="margin: 0;">Impreso / Generado: ${new Date().toLocaleString('es-PE')} | Sistema Integral DALUPEZMAR</p>
-          <p style="margin: 1px 0 0 0; color: #94a3b8;">Cálculos automáticos basados en el D.L. 854 y D.S. 007-2002-TR (Microempresa / General).</p>
+          <p style="margin: 1px 0 0 0; color: #94a3b8;">Parte de asistencia oficial para control laboral y registro de supervisión.</p>
         </div>
         <div style="display: flex; gap: 40px;">
           <div style="border-top: 1px solid #475569; width: 140px; text-align: center; padding-top: 2px;">

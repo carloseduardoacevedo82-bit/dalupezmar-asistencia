@@ -99,7 +99,7 @@
       </div>
 
       <!-- Filtros Rápidos Diarios -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-800">
         <div>
           <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Fecha del Día</label>
           <input type="date" id="daily-rep-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-bold">
@@ -116,6 +116,17 @@
             <option value="Administración y Finanzas">Administración y Finanzas</option>
             <option value="Recursos Humanos y Talento">Recursos Humanos y Talento</option>
             <option value="Tecnología e Innovación">Tecnología e Innovación</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-amber-400 uppercase mb-1 flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i> Filtrar por Turno
+          </label>
+          <select id="daily-rep-shift" class="w-full bg-slate-900 border border-amber-500/50 rounded-xl px-3.5 py-2 text-xs text-amber-300 focus:outline-none focus:border-amber-400 font-bold">
+            <option value="">Todos los Turnos (Consolidado)</option>
+            <option value="diurno">☀️ Turno Diurno (07:30 - 19:00)</option>
+            <option value="nocturno">🌙 Turno Nocturno (19:30 - 07:00)</option>
           </select>
         </div>
 
@@ -380,10 +391,10 @@
   <div id="print-attendance-sheet" class="hidden"></div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=8.3"></script>
-  <script src="/js/auth.js?v=8.3"></script>
+  <script src="/js/api.js?v=8.4"></script>
+  <script src="/js/auth.js?v=8.4"></script>
   <script src="/js/exceljs.min.js"></script>
-  <script src="/js/reports.js?v=8.3"></script>
+  <script src="/js/reports.js?v=8.4"></script>
   <script>
     lucide.createIcons();
   </script>
