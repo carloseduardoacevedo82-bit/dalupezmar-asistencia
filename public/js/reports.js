@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-query-report')?.addEventListener('click', executeReportQuery);
   document.getElementById('btn-export-excel')?.addEventListener('click', exportToExcel);
   document.getElementById('btn-export-csv')?.addEventListener('click', exportToCsv);
+  document.getElementById('btn-print-report')?.addEventListener('click', handleDailyExportPdf);
 
   // Botones de reporte diario por áreas
   document.getElementById('btn-daily-export-excel')?.addEventListener('click', handleDailyExportExcel);
@@ -178,343 +179,115 @@ function calculateTotals(data) {
 }
 
 /**
- * Exportar a Excel (.xlsx) con Formato de Tabla y Fuente Tamaño 11
- */
-async function exportToExcel() {
-  if (reportData.length === 0) {
-    showToast('No hay datos para exportar.', 'warning');
-    return;
-  }
-
-  const sortedData = [...reportData].sort((a, b) => {
-    const rankA = getAreaHierarchyRank(a.position_name, a.department_name);
-    const rankB = getAreaHierarchyRank(b.position_name, b.department_name);
-
-    if (rankA !== rankB) {
-      return rankA - rankB;
-    }
-
-    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
-    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
-    return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
-  });
-
-  const fileName = `Tareo_Asistencia_${new Date().toISOString().split('T')[0]}.xlsx`;
-
-  if (window.ExcelJS) {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.';
-    workbook.created = new Date();
-
-    const worksheet = workbook.addWorksheet('Tareo_General', {
-      views: [{ showGridLines: true }]
-    });
-
-    const columns = [
-      { name: 'N°', width: 6 },
-      { name: 'Fecha', width: 14 },
-      { name: 'Código Empleado', width: 16 },
-      { name: 'Documento', width: 16 },
-      { name: 'Apellidos y Nombres', width: 38 },
-      { name: 'Departamento / Área', width: 24 },
-      { name: 'Cargo / Puesto', width: 28 },
-      { name: 'Turno Asignado', width: 28 },
-      { name: 'Hora Entrada', width: 15 },
-      { name: 'Hora Salida', width: 15 },
-      { name: 'Total Horas Trabajadas', width: 22 },
-      { name: 'Horas Ordinarias', width: 18 },
-      { name: 'Horas Extras 25%', width: 18 },
-      { name: 'Horas Extras 35%', width: 18 },
-      { name: 'Minutos Tardanza', width: 16 },
-      { name: 'Estado Asistencia', width: 18 }
-    ];
-
-    const rows = sortedData.map((r, index) => {
-      const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
-      
-      let totalHoras = 0;
-      if (r.first_entry_time && r.last_exit_time) {
-        const entryMs = new Date(r.first_entry_time).getTime();
-        let exitMs = new Date(r.last_exit_time).getTime();
-        if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
-        const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
-        const netMin = Math.max(0, grossMin - 60); // Descuento 1h de refrigerio
-        totalHoras = Number((netMin / 60).toFixed(2));
-      } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
-        const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
-        totalHoras = Number((netMin / 60).toFixed(2));
-        if (totalHoras === 0) totalHoras = 10.50;
-      } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
-        totalHoras = 10.50; // Jornada completa computable estándar
-      }
-
-      const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
-      const exceso = Math.max(0, totalHoras - 8.00);
-      const he25 = Number(Math.min(2.00, exceso).toFixed(2));
-      const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
-
-      const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
-      const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
-
-      return [
-        index + 1,
-        String(r.attendance_date || '').split('T')[0],
-        r.employee_code,
-        r.document_number,
-        `${r.last_name}, ${r.first_name}`.toUpperCase(),
-        r.department_name || '',
-        r.position_name || '',
-        shiftName,
-        formatTime(r.first_entry_time),
-        formatTime(r.last_exit_time),
-        totalHoras,
-        horasBase,
-        he25,
-        he35,
-        r.total_minutes_late || 0,
-        r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
-      ];
-    });
-
-    // Fila de inicio de datos
-    worksheet.addRow(columns.map(c => c.name));
-    const startDataRow = 2;
-    rows.forEach(r => worksheet.addRow(r));
-    const endDataRow = startDataRow + rows.length - 1;
-
-    // Fila de totales generales al final con fórmulas nativas SUM de Excel
-    const totalRow = worksheet.addRow([
-      '',
-      'TOTALES GENERALES',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      { formula: `SUM(K${startDataRow}:K${endDataRow})` }, // Suma Total Horas Trabajadas
-      { formula: `SUM(L${startDataRow}:L${endDataRow})` }, // Suma Horas Ordinarias
-      { formula: `SUM(M${startDataRow}:M${endDataRow})` }, // Suma Horas Extras 25%
-      { formula: `SUM(N${startDataRow}:N${endDataRow})` }, // Suma Horas Extras 35%
-      { formula: `SUM(O${startDataRow}:O${endDataRow})` }, // Suma Tardanzas
-      ''
-    ]);
-
-    columns.forEach((c, i) => {
-      worksheet.getColumn(i + 1).width = c.width;
-    });
-
-    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      row.height = rowNumber === 1 ? 26 : (rowNumber === endRow + 1 ? 24 : 20);
-
-      row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-        // Encabezado
-        if (rowNumber === 1) {
-          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-          cell.alignment = { vertical: 'middle', horizontal: colNumber >= 11 && colNumber <= 15 ? 'right' : 'center' };
-          cell.border = {
-            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-            bottom: { style: 'medium', color: { argb: 'FF475569' } },
-            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
-            right: { style: 'thin', color: { argb: 'FF94A3B8' } }
-          };
-          return;
-        }
-
-        // Fila de Totales Generales
-        if (rowNumber === endRow + 1) {
-          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
-          cell.border = {
-            top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-            bottom: { style: 'double', color: { argb: 'FFFFFFFF' } }
-          };
-          if (colNumber >= 11 && colNumber <= 15) {
-            cell.numFmt = '0.00';
-            cell.alignment = { vertical: 'middle', horizontal: 'right' };
-          } else if (colNumber === 2) {
-            cell.alignment = { vertical: 'middle', horizontal: 'center' };
-          }
-          return;
-        }
-
-        // Filas de Datos
-        cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
-        const isLeftAlign = colNumber === 5 || colNumber === 6 || colNumber === 7 || colNumber === 8;
-        cell.alignment = {
-          vertical: 'middle',
-          horizontal: (colNumber >= 11 && colNumber <= 15) ? 'right' : (isLeftAlign ? 'left' : 'center'),
-          wrapText: false
-        };
-
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-        };
-
-        // Formato numérico decimal puro (0.00)
-        if (colNumber >= 11 && colNumber <= 14) {
-          cell.numFmt = '0.00';
-          if (colNumber === 11) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
-          if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
-          if (colNumber === 14) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
-        }
-
-        if (colNumber === 16) {
-          const val = String(cell.value || '');
-          if (val === 'PUNTUAL') {
-            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
-          } else if (val === 'TARDANZA') {
-            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFD97706' } };
-          } else if (val === 'FALTA') {
-            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFDC2626' } };
-          }
-        }
-      });
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = fileName;
-    link.click();
-    window.URL.revokeObjectURL(downloadUrl);
-
-    showToast('¡Archivo Excel (.xlsx) con distribución de horas exportado exitosamente!', 'success');
-    return;
-  }
-
-  // Fallback con SheetJS
-  let fTot = 0, fOrd = 0, f25 = 0, f35 = 0, fLate = 0;
-  const exportRows = sortedData.map((r, index) => {
-    const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
-
-    let totalHoras = 0;
-    if (r.first_entry_time && r.last_exit_time) {
-      const entryMs = new Date(r.first_entry_time).getTime();
-      let exitMs = new Date(r.last_exit_time).getTime();
-      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
-      const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
-      const netMin = Math.max(0, grossMin - 60);
-      totalHoras = Number((netMin / 60).toFixed(2));
-    } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
-      const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
-      totalHoras = Number((netMin / 60).toFixed(2));
-      if (totalHoras === 0) totalHoras = 10.50;
-    } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
-      totalHoras = 10.50;
-    }
-
-    const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
-    const exceso = Math.max(0, totalHoras - 8.00);
-    const he25 = Number(Math.min(2.00, exceso).toFixed(2));
-    const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
-    const late = Number(r.total_minutes_late || 0);
-
-    fTot += totalHoras;
-    fOrd += horasBase;
-    f25 += he25;
-    f35 += he35;
-    fLate += late;
-
-    const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
-    const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
-
-    return {
-      'N°': index + 1,
-      'Fecha': String(r.attendance_date || '').split('T')[0],
-      'Código Empleado': r.employee_code,
-      'Documento': r.document_number,
-      'Apellidos y Nombres': `${r.last_name}, ${r.first_name}`.toUpperCase(),
-      'Departamento / Área': r.department_name || '',
-      'Cargo / Puesto': r.position_name || '',
-      'Turno Asignado': shiftName,
-      'Hora Entrada': formatTime(r.first_entry_time),
-      'Hora Salida': formatTime(r.last_exit_time),
-      'Total Horas Trabajadas': totalHoras,
-      'Horas Ordinarias': horasBase,
-      'Horas Extras 25%': he25,
-      'Horas Extras 35%': he35,
-      'Minutos Tardanza': late,
-      'Estado Asistencia': r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
-    };
-  });
-
-  exportRows.push({
-    'N°': '',
-    'Fecha': 'TOTALES GENERALES',
-    'Código Empleado': '',
-    'Documento': '',
-    'Apellidos y Nombres': '',
-    'Departamento / Área': '',
-    'Cargo / Puesto': '',
-    'Turno Asignado': '',
-    'Hora Entrada': '',
-    'Hora Salida': '',
-    'Total Horas Trabajadas': Number(fTot.toFixed(2)),
-    'Horas Ordinarias': Number(fOrd.toFixed(2)),
-    'Horas Extras 25%': Number(f25.toFixed(2)),
-    'Horas Extras 35%': Number(f35.toFixed(2)),
-    'Minutos Tardanza': fLate,
-    'Estado Asistencia': ''
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(exportRows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Tareo_Asistencia');
-  XLSX.writeFile(workbook, fileName);
-  showToast('¡Archivo Excel (.xlsx) exportado exitosamente!', 'success');
+ * Exportar a Excel (.xlsx) con Formato de Tabla y Fuente async function exportToExcel() {
+  await handleDailyExportExcel();
 }
 
 /**
- * Exportar a CSV
+ * Exportar a CSV con las 16 columnas canónicas de Asistencia y Totales
  */
-function exportToCsv() {
-  if (reportData.length === 0) {
-    showToast('No hay datos para exportar.', 'warning');
-    return;
-  }
+async function exportToCsv() {
+  const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
+  const areaSelect = document.getElementById('daily-rep-area')?.value || '';
 
-  const headers = ['Fecha', 'Codigo', 'Documento', 'Nombres', 'Apellidos', 'Area', 'Cargo', 'Entrada', 'Salida', 'HorasTrabajadas', 'TardanzaMin', 'HorasExtras', 'Estado'];
-  
-  const csvRows = [headers.join(',')];
+  showToast('Generando archivo CSV oficial...', 'info');
 
-  reportData.forEach(r => {
-    const row = [
-      r.attendance_date,
-      r.employee_code,
-      r.document_number,
-      `"${r.first_name}"`,
-      `"${r.last_name}"`,
-      `"${r.department_name || ''}"`,
-      `"${r.position_name || ''}"`,
-      r.first_entry_time ? new Date(r.first_entry_time).toLocaleTimeString('es-PE') : '',
-      r.last_exit_time ? new Date(r.last_exit_time).toLocaleTimeString('es-PE') : '',
-      (r.total_minutes_worked / 60).toFixed(2),
-      r.total_minutes_late,
-      (r.total_minutes_overtime / 60).toFixed(2),
-      r.status
+  try {
+    const list = await fetchDailyAttendanceData(dateInput, areaSelect);
+    if (list.length === 0) {
+      showToast('No hay datos para exportar.', 'warning');
+      return;
+    }
+
+    const areaTag = areaSelect ? `_${areaSelect.replace(/\s+/g, '_')}` : '_Todas_Areas';
+    const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}.csv`;
+
+    const headers = [
+      'Planta',
+      'Área',
+      'Tipo Doc',
+      'N° Documento',
+      'Código ID',
+      'Apellidos y Nombres',
+      'Cargo / Puesto',
+      'Turno Asignado',
+      'Hora Ingreso',
+      'Hora Salida',
+      'Total Horas Trabajadas',
+      'Horas Ordinarias',
+      'Horas Extras 25%',
+      'Horas Extras 35%',
+      'Tardanza (Min)',
+      'Estado Asistencia'
     ];
-    csvRows.push(row.join(','));
-  });
 
-  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', `Tareo_${new Date().toISOString().split('T')[0]}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
+    const csvRows = [headers.join(',')];
 
-  showToast('Archivo CSV descargado.', 'success');
+    list.forEach(item => {
+      sumTot += item.totalWorkedHours;
+      sumOrd += item.regularHours;
+      sum25 += item.overtime25Hours;
+      sum35 += item.overtime35Hours;
+      sumLate += item.lateMins;
+
+      const statusText = item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? 'TARDANZA' : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'));
+
+      const row = [
+        `"${item.branch}"`,
+        `"${item.area}"`,
+        item.docType,
+        item.docNumber,
+        item.code,
+        `"${item.fullName}"`,
+        `"${item.position}"`,
+        `"${item.shiftName}"`,
+        item.firstEntry,
+        item.lastExit,
+        item.totalWorkedHours.toFixed(2),
+        item.regularHours.toFixed(2),
+        item.overtime25Hours.toFixed(2),
+        item.overtime35Hours.toFixed(2),
+        item.lateMins,
+        statusText
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    // Fila de Totales Generales
+    csvRows.push([
+      '"TOTALES GENERALES"',
+      '""',
+      '""',
+      '""',
+      '""',
+      '""',
+      '""',
+      '""',
+      '""',
+      '""',
+      sumTot.toFixed(2),
+      sumOrd.toFixed(2),
+      sum25.toFixed(2),
+      sum35.toFixed(2),
+      sumLate,
+      '""'
+    ].join(','));
+
+    const blob = new Blob(["\uFEFF" + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('¡Archivo CSV descargado exitosamente!', 'success');
+  } catch (error) {
+    showToast('Error al exportar CSV: ' + error.message, 'error');
+  }
 }
 
 /**
@@ -684,9 +457,10 @@ async function fetchDailyAttendanceData(dateStr, selectedArea) {
 
 /**
  * Exportar Asistencia Diaria a Excel (.xlsx) con Formato de Tabla y Fuente Tamaño 11
+ * Estructura oficial de 16 columnas con Planta al inicio y totales automáticos
  */
 async function handleDailyExportExcel() {
-  const dateInput = document.getElementById('daily-rep-date')?.value || new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
   const areaSelect = document.getElementById('daily-rep-area')?.value || '';
 
   showToast('Generando archivo Excel con formato de tabla...', 'info');
@@ -708,13 +482,11 @@ async function handleDailyExportExcel() {
       workbook.creator = 'DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.';
       workbook.created = new Date();
 
-      const worksheet = workbook.addWorksheet('Asistencia_Diaria', {
+      const worksheet = workbook.addWorksheet('Asistencia Diaria', {
         views: [{ showGridLines: true }]
       });
 
       const columns = [
-        { name: 'N°', width: 6 },
-        { name: 'Fecha', width: 14 },
         { name: 'Planta', width: 16 },
         { name: 'Área', width: 24 },
         { name: 'Tipo Doc', width: 11 },
@@ -733,9 +505,7 @@ async function handleDailyExportExcel() {
         { name: 'Estado Asistencia', width: 18 }
       ];
 
-      const rows = list.map((item, index) => [
-        index + 1,
-        dateInput,
+      const rows = list.map((item) => [
         item.branch,
         item.area,
         item.docType,
@@ -762,7 +532,6 @@ async function handleDailyExportExcel() {
 
       // Fila de Totales Generales con Fórmulas Nativas SUM de Excel
       const totalRow = worksheet.addRow([
-        '',
         'TOTALES GENERALES',
         '',
         '',
@@ -773,12 +542,11 @@ async function handleDailyExportExcel() {
         '',
         '',
         '',
-        '',
-        { formula: `SUM(M${startRow}:M${endRow})` }, // Suma Total Horas Trabajadas
-        { formula: `SUM(N${startRow}:N${endRow})` }, // Suma Horas Ordinarias
-        { formula: `SUM(O${startRow}:O${endRow})` }, // Suma Horas Extras 25%
-        { formula: `SUM(P${startRow}:P${endRow})` }, // Suma Horas Extras 35%
-        { formula: `SUM(Q${startRow}:Q${endRow})` }, // Suma Tardanzas
+        { formula: `SUM(K${startRow}:K${endRow})` }, // Suma Total Horas Trabajadas
+        { formula: `SUM(L${startRow}:L${endRow})` }, // Suma Horas Ordinarias
+        { formula: `SUM(M${startRow}:M${endRow})` }, // Suma Horas Extras 25%
+        { formula: `SUM(N${startRow}:N${endRow})` }, // Suma Horas Extras 35%
+        { formula: `SUM(O${startRow}:O${endRow})` }, // Suma Tardanzas
         ''
       ]);
 
@@ -794,7 +562,7 @@ async function handleDailyExportExcel() {
           if (rowNumber === 1) {
             cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-            cell.alignment = { vertical: 'middle', horizontal: colNumber >= 13 && colNumber <= 17 ? 'right' : 'center' };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber >= 11 && colNumber <= 15 ? 'right' : 'center' };
             cell.border = {
               top: { style: 'thin', color: { argb: 'FF94A3B8' } },
               bottom: { style: 'medium', color: { argb: 'FF475569' } },
@@ -812,10 +580,10 @@ async function handleDailyExportExcel() {
               top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
               bottom: { style: 'double', color: { argb: 'FFFFFFFF' } }
             };
-            if (colNumber >= 13 && colNumber <= 17) {
+            if (colNumber >= 11 && colNumber <= 15) {
               cell.numFmt = '0.00';
               cell.alignment = { vertical: 'middle', horizontal: 'right' };
-            } else if (colNumber === 2) {
+            } else if (colNumber === 1) {
               cell.alignment = { vertical: 'middle', horizontal: 'center' };
             }
             return;
@@ -823,10 +591,10 @@ async function handleDailyExportExcel() {
 
           // Filas de Datos
           cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
-          const isLeftAlign = colNumber === 4 || colNumber === 8 || colNumber === 9 || colNumber === 10;
+          const isLeftAlign = colNumber === 1 || colNumber === 2 || colNumber === 6 || colNumber === 7;
           cell.alignment = {
             vertical: 'middle',
-            horizontal: (colNumber >= 13 && colNumber <= 17) ? 'right' : (isLeftAlign ? 'left' : 'center'),
+            horizontal: (colNumber >= 11 && colNumber <= 15) ? 'right' : (isLeftAlign ? 'left' : 'center'),
             wrapText: false
           };
 
@@ -838,14 +606,14 @@ async function handleDailyExportExcel() {
           };
 
           // Formato numérico decimal puro (0.00)
-          if (colNumber >= 13 && colNumber <= 16) {
+          if (colNumber >= 11 && colNumber <= 14) {
             cell.numFmt = '0.00';
-            if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
-            if (colNumber === 15) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
-            if (colNumber === 16) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
+            if (colNumber === 11) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
+            if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
+            if (colNumber === 14) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
           }
 
-          if (colNumber === 18) {
+          if (colNumber === 16) {
             const val = String(cell.value || '');
             if (val === 'PUNTUAL') {
               cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
@@ -867,20 +635,19 @@ async function handleDailyExportExcel() {
       link.click();
       window.URL.revokeObjectURL(downloadUrl);
 
-      showToast('¡Excel en formato tabla con horas extras descargado exitosamente!', 'success');
+      showToast('¡Excel de asistencia diaria descargado exitosamente!', 'success');
       return;
     }
 
     // Fallback con SheetJS
-    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0;
-    const exportRows = list.map((item, index) => {
+    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
+    const exportRows = list.map((item) => {
       sumTot += item.totalWorkedHours;
       sumOrd += item.regularHours;
       sum25 += item.overtime25Hours;
       sum35 += item.overtime35Hours;
+      sumLate += item.lateMins;
       return {
-        'N°': index + 1,
-        'Fecha': dateInput,
         'Planta': item.branch,
         'Área': item.area,
         'Tipo Doc': item.docType,
@@ -902,9 +669,7 @@ async function handleDailyExportExcel() {
 
     // Fila de totales generales
     exportRows.push({
-      'N°': '',
-      'Fecha': 'TOTALES GENERALES',
-      'Planta': '',
+      'Planta': 'TOTALES GENERALES',
       'Área': '',
       'Tipo Doc': '',
       'N° Documento': '',
@@ -918,13 +683,13 @@ async function handleDailyExportExcel() {
       'Horas Ordinarias': Number(sumOrd.toFixed(2)),
       'Horas Extras 25%': Number(sum25.toFixed(2)),
       'Horas Extras 35%': Number(sum35.toFixed(2)),
-      'Tardanza (Min)': '',
+      'Tardanza (Min)': sumLate,
       'Estado Asistencia': ''
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Asistencia_Diaria');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Asistencia Diaria');
     XLSX.writeFile(workbook, fileName);
 
     showToast('¡Excel de asistencia diaria descargado exitosamente!', 'success');
@@ -934,14 +699,15 @@ async function handleDailyExportExcel() {
 }
 
 /**
- * Descargar / Imprimir Reporte PDF Oficial de Asistencia Diaria
+ * Descargar / Imprimir Reporte PDF Oficial de Asistencia Diaria en Orientación Horizontal (Landscape)
+ * Garantiza que la información ingrese 100% completa a la hoja sin desbordes.
  */
 async function handleDailyExportPdf() {
-  const dateInput = document.getElementById('daily-rep-date')?.value || new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
   const areaSelect = document.getElementById('daily-rep-area')?.value || '';
-  const areaTitle = areaSelect ? areaSelect.toUpperCase() : 'TODAS LAS ÁREAS (GENERAL)';
+  const areaTitle = areaSelect ? areaSelect.toUpperCase() : 'TODAS LAS ÁREAS (CONSOLIDADO)';
 
-  showToast('Generando vista oficial para exportar a PDF...', 'info');
+  showToast('Preparando reporte para impresión horizontal / PDF...', 'info');
 
   try {
     const list = await fetchDailyAttendanceData(dateInput, areaSelect);
@@ -954,220 +720,149 @@ async function handleDailyExportPdf() {
     const totalCount = list.length;
     const presentCount = list.filter(i => i.status === 'PRESENT').length;
     const lateCount = list.filter(i => i.status === 'LATE').length;
-    const absentCount = list.filter(i => i.status === 'ABSENT').length;
+    const absentCount = list.filter(i => i.status === 'ABSENT' || !i.status).length;
+
+    let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
+    list.forEach(i => {
+      sumTot += i.totalWorkedHours;
+      sumOrd += i.regularHours;
+      sum25 += i.overtime25Hours;
+      sum35 += i.overtime35Hours;
+      sumLate += i.lateMins;
+    });
 
     const rowsHtml = list.map((item, index) => {
-      const statusBadge = item.status === 'PRESENT' 
-        ? '<span style="color:#059669; font-weight:800;">PUNTUAL</span>' 
-        : (item.status === 'LATE' 
-          ? '<span style="color:#d97706; font-weight:800;">TARDANZA (' + item.lateMins + 'm)</span>' 
-          : (item.status === 'JUSTIFIED' 
-            ? '<span style="color:#7c3aed; font-weight:800;">JUSTIFICADO</span>' 
-            : '<span style="color:#dc2626; font-weight:800;">FALTA</span>'));
+      const isNight = item.shiftName.includes('Nocturno') || item.shiftName.includes('19:30');
+      const shiftShort = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+      const statusText = item.status === 'PRESENT' ? 'PUNTUAL' : (item.status === 'LATE' ? `TARDANZA (${item.lateMins}m)` : (item.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'));
+      const statusColor = item.status === 'PRESENT' ? '#059669' : (item.status === 'LATE' ? '#d97706' : '#dc2626');
 
       return `
-        <tr style="border-bottom: 1px solid #e2e8f0; font-size: 8.5pt; ${index % 2 === 0 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
-          <td style="padding: 5px 6px; text-align: center; font-weight: bold; color: #475569;">${index + 1}</td>
-          <td style="padding: 5px 6px; font-family: monospace; font-weight: bold; color: #002855;">${item.code}</td>
-          <td style="padding: 5px 6px; font-family: monospace; font-weight: bold;">${item.docType}: ${item.docNumber}</td>
-          <td style="padding: 5px 6px; font-weight: 800; color: #0f172a;">${item.fullName}</td>
-          <td style="padding: 5px 6px; color: #0369a1; font-weight: 700;">${item.area}</td>
-          <td style="padding: 5px 6px; color: #334155;">${item.position}</td>
-          <td style="padding: 5px 6px; text-align: center; font-family: monospace; font-weight: 700; color: #0284c7;">${item.firstEntry}</td>
-          <td style="padding: 5px 6px; text-align: center; font-family: monospace; font-weight: 700; color: #0284c7;">${item.lastExit}</td>
-          <td style="padding: 5px 6px; text-align: center; font-weight: bold;">${item.hoursWorked} h</td>
-          <td style="padding: 5px 6px; text-align: center;">${statusBadge}</td>
+        <tr>
+          <td style="text-align: center; font-weight: bold;">${index + 1}</td>
+          <td>${item.branch}</td>
+          <td style="font-weight: 600;">${item.area}</td>
+          <td style="text-align: center;">${item.docType}</td>
+          <td style="text-align: center; font-family: monospace;">${item.docNumber}</td>
+          <td style="text-align: center; font-family: monospace; font-weight: bold; color: #002855;">${item.code}</td>
+          <td style="font-weight: 700; text-transform: uppercase;">${item.fullName}</td>
+          <td>${item.position}</td>
+          <td style="text-align: center; font-size: 6.2pt;">${shiftShort}</td>
+          <td style="text-align: center; font-family: monospace;">${item.firstEntry}</td>
+          <td style="text-align: center; font-family: monospace;">${item.lastExit}</td>
+          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #047857;">${item.totalWorkedHours.toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace;">${item.regularHours.toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace; color: #b45309; font-weight: bold;">${item.overtime25Hours.toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace; color: #c2410c; font-weight: bold;">${item.overtime35Hours.toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace;">${item.lateMins}</td>
+          <td style="text-align: center; font-weight: 800; color: ${statusColor}; font-size: 6.5pt;">${statusText}</td>
         </tr>
       `;
     }).join('');
 
-    const pdfWindow = window.open('', '_blank');
-    pdfWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <title>DALUPEZMAR - Parte Diario de Asistencia (${dateInput})</title>
-        <style>
-          @page {
-            size: A4 portrait;
-            margin: 8mm 8mm;
-          }
-          * {
-            box-sizing: border-box;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            color: #0f172a;
-            background: #ffffff;
-          }
-          .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 2.5px solid #002855;
-            padding-bottom: 8px;
-            margin-bottom: 12px;
-          }
-          .company-info h1 {
-            margin: 0;
-            font-size: 14pt;
-            font-weight: 900;
-            color: #002855;
-            letter-spacing: 0.5px;
-          }
-          .company-info p {
-            margin: 2px 0 0 0;
-            font-size: 8pt;
-            color: #475569;
-          }
-          .report-badge {
-            text-align: right;
-          }
-          .report-badge h2 {
-            margin: 0;
-            font-size: 11pt;
-            font-weight: 900;
-            color: #0284c7;
-          }
-          .report-badge p {
-            margin: 2px 0 0 0;
-            font-size: 8.5pt;
-            font-weight: bold;
-            color: #334155;
-          }
-          .kpi-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 12px;
-          }
-          .kpi-box {
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 6px 10px;
-            text-align: center;
-          }
-          .kpi-title {
-            font-size: 7.5pt;
-            font-weight: 800;
-            color: #475569;
-            text-transform: uppercase;
-          }
-          .kpi-val {
-            font-size: 13pt;
-            font-weight: 900;
-            margin-top: 2px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-          th {
-            background: #002855;
-            color: #ffffff;
-            font-size: 8pt;
-            font-weight: 800;
-            text-transform: uppercase;
-            padding: 6px 6px;
-            text-align: left;
-          }
-          .footer {
-            margin-top: 20px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 7.5pt;
-            color: #64748b;
-            border-top: 1px solid #cbd5e1;
-            padding-top: 8px;
-          }
-          .signature-box {
-            margin-top: 35px;
-            display: flex;
-            justify-content: space-around;
-            text-align: center;
-          }
-          .sig-line {
-            width: 180px;
-            border-top: 1px solid #334155;
-            padding-top: 4px;
-            font-size: 8pt;
-            font-weight: bold;
-            color: #334155;
-          }
-        </style>
-      </head>
-      <body onload="window.print()">
-        <div class="header">
-          <div class="company-info">
-            <h1>DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.</h1>
-            <p>RUC: 20615714128 • <b>PLANTA PRINCIPAL: PECEPE S.A.C.</b></p>
-            <p>P.J. Calle Asoc De Fam Santa Rosa De Villa Lomo De Corvina Mz.F, Lt 2, Villa El Salvador</p>
+    let printContainer = document.getElementById('print-attendance-sheet');
+    if (!printContainer) {
+      printContainer = document.createElement('div');
+      printContainer.id = 'print-attendance-sheet';
+      document.body.appendChild(printContainer);
+    }
+
+    printContainer.innerHTML = `
+      <div style="padding: 0 0 6px 0; border-bottom: 2px solid #002855; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+          <h1 style="font-size: 11pt; font-weight: 900; color: #002855; margin: 0; letter-spacing: 0.5px;">DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.</h1>
+          <p style="font-size: 6.8pt; color: #475569; margin: 1px 0 0 0; font-weight: bold;">RUC: 20615714128 • PLANTA PRINCIPAL PECEPE S.A.C.</p>
+        </div>
+        <div style="text-align: center;">
+          <h2 style="font-size: 9.5pt; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase;">PARTE DIARIO CONSOLIDADO DE ASISTENCIA Y HORAS EXTRAS</h2>
+          <p style="font-size: 6.8pt; color: #0284c7; margin: 1px 0 0 0; font-weight: bold;">Área: ${areaTitle} • Jornadas Fijas: Diurno (07:30 - 19:00) / Nocturno (19:30 - 07:00) • 1h Refrigerio Descontada</p>
+        </div>
+        <div style="text-align: right; font-size: 6.8pt; color: #64748b;">
+          <p style="margin: 0;"><b>Fecha Reporte:</b> ${dateInput}</p>
+          <p style="margin: 1px 0 0 0;"><b>Total Personal:</b> ${totalCount} colaboradores</p>
+        </div>
+      </div>
+
+      <!-- Tarjetas de Resumen KPI -->
+      <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+        <div style="flex: 1; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; text-align: center;">
+          <span style="font-size: 6.5pt; font-weight: 800; color: #475569; text-transform: uppercase;">Total Personal: </span>
+          <span style="font-size: 8pt; font-weight: 900; color: #002855;">${totalCount}</span>
+        </div>
+        <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 4px; padding: 3px 6px; text-align: center;">
+          <span style="font-size: 6.5pt; font-weight: 800; color: #065f46; text-transform: uppercase;">Puntuales: </span>
+          <span style="font-size: 8pt; font-weight: 900; color: #059669;">${presentCount}</span>
+        </div>
+        <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 3px 6px; text-align: center;">
+          <span style="font-size: 6.5pt; font-weight: 800; color: #92400e; text-transform: uppercase;">Tardanzas: </span>
+          <span style="font-size: 8pt; font-weight: 900; color: #d97706;">${lateCount}</span>
+        </div>
+        <div style="flex: 1; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 3px 6px; text-align: center;">
+          <span style="font-size: 6.5pt; font-weight: 800; color: #991b1b; text-transform: uppercase;">Faltas: </span>
+          <span style="font-size: 8pt; font-weight: 900; color: #dc2626;">${absentCount}</span>
+        </div>
+      </div>
+
+      <table class="print-table">
+        <thead>
+          <tr>
+            <th style="width: 2.5%;">#</th>
+            <th style="width: 6%;">Planta</th>
+            <th style="width: 8.5%;">Área</th>
+            <th style="width: 3.5%;">Doc</th>
+            <th style="width: 6.5%;">N° Doc</th>
+            <th style="width: 5.5%;">Código ID</th>
+            <th style="width: 16.5%;">Apellidos y Nombres</th>
+            <th style="width: 11%;">Cargo / Puesto</th>
+            <th style="width: 9.5%;">Turno Asignado</th>
+            <th style="width: 5.5%;">Hora Ingreso</th>
+            <th style="width: 5.5%;">Hora Salida</th>
+            <th style="width: 4.2%;">Total Horas</th>
+            <th style="width: 3.8%;">Horas Ord.</th>
+            <th style="width: 3.8%;">HE 25%</th>
+            <th style="width: 3.8%;">HE 35%</th>
+            <th style="width: 3.5%;">Tard. (Min)</th>
+            <th style="width: 4.7%;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="11" style="text-align: center; font-weight: 900; letter-spacing: 1px;">TOTALES GENERALES</td>
+            <td style="text-align: right; font-family: monospace;">${sumTot.toFixed(2)}</td>
+            <td style="text-align: right; font-family: monospace;">${sumOrd.toFixed(2)}</td>
+            <td style="text-align: right; font-family: monospace;">${sum25.toFixed(2)}</td>
+            <td style="text-align: right; font-family: monospace;">${sum35.toFixed(2)}</td>
+            <td style="text-align: right; font-family: monospace;">${sumLate}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 6.8pt; color: #475569; page-break-inside: avoid;">
+        <div>
+          <p style="margin: 0;">Impreso / Generado: ${new Date().toLocaleString('es-PE')} | Sistema Integral DALUPEZMAR</p>
+          <p style="margin: 1px 0 0 0; color: #94a3b8;">Cálculos automáticos basados en el D.L. 854 y D.S. 007-2002-TR (Microempresa / General).</p>
+        </div>
+        <div style="display: flex; gap: 40px;">
+          <div style="border-top: 1px solid #475569; width: 140px; text-align: center; padding-top: 2px;">
+            <p style="margin: 0; font-weight: bold; color: #0f172a;">SUPERVISOR DE TURNO</p>
+            <p style="margin: 0; font-size: 6pt; color: #64748b;">Firma y Sello</p>
           </div>
-          <div class="report-badge">
-            <h2>PARTE DIARIO DE ASISTENCIA</h2>
-            <p>FECHA: ${dateInput} | ÁREA: ${areaTitle}</p>
+          <div style="border-top: 1px solid #475569; width: 140px; text-align: center; padding-top: 2px;">
+            <p style="margin: 0; font-weight: bold; color: #0f172a;">RECURSOS HUMANOS</p>
+            <p style="margin: 0; font-size: 6pt; color: #64748b;">V° B° DALUPEZMAR</p>
           </div>
         </div>
+      </div>
+    `;
 
-        <div class="kpi-container">
-          <div class="kpi-box">
-            <div class="kpi-title">Total Personal</div>
-            <div class="kpi-val" style="color: #002855;">${totalCount}</div>
-          </div>
-          <div class="kpi-box" style="background: #ecfdf5; border-color: #a7f3d0;">
-            <div class="kpi-title" style="color: #065f46;">Presentes Puntuales</div>
-            <div class="kpi-val" style="color: #059669;">${presentCount}</div>
-          </div>
-          <div class="kpi-box" style="background: #fffbeb; border-color: #fde68a;">
-            <div class="kpi-title" style="color: #92400e;">Tardanzas</div>
-            <div class="kpi-val" style="color: #d97706;">${lateCount}</div>
-          </div>
-          <div class="kpi-box" style="background: #fef2f2; border-color: #fecaca;">
-            <div class="kpi-title" style="color: #991b1b;">Inasistencias</div>
-            <div class="kpi-val" style="color: #dc2626;">${absentCount}</div>
-          </div>
-        </div>
+    setTimeout(() => {
+      window.print();
+    }, 150);
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 25px; text-align: center;">#</th>
-              <th style="width: 60px;">Código</th>
-              <th style="width: 90px;">Documento</th>
-              <th>Apellidos y Nombres</th>
-              <th>Área</th>
-              <th>Puesto / Cargo</th>
-              <th style="width: 60px; text-align: center;">Entrada</th>
-              <th style="width: 60px; text-align: center;">Salida</th>
-              <th style="width: 50px; text-align: center;">Horas</th>
-              <th style="width: 90px; text-align: center;">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="signature-box">
-          <div class="sig-line">Supervisor de Turno / Planta</div>
-          <div class="sig-line">Responsable de RRHH / Asistencia</div>
-        </div>
-
-        <div class="footer">
-          <span>Emitido por Sistema Integrado de Control de Asistencia y Fotochecks DALUPEZMAR</span>
-          <span>Planta Principal PECEPE S.A.C. • Impreso: ${new Date().toLocaleString('es-PE')}</span>
-        </div>
-      </body>
-      </html>
-    `);
-
-    pdfWindow.document.close();
   } catch (error) {
     showToast('Error al generar PDF: ' + error.message, 'error');
   }

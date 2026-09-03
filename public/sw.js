@@ -1,11 +1,11 @@
-const CACHE_NAME = 'dalupezmar-cache-v7.0';
+const CACHE_NAME = 'dalupezmar-cache-v8.0';
 const ASSETS_TO_CACHE = [
   '/',
   '/app.html',
   '/index.html',
-  '/css/styles.css?v=7.0',
-  '/js/api.js?v=7.0',
-  '/js/auth.js?v=7.0',
+  '/css/styles.css?v=8.0',
+  '/js/api.js?v=8.0',
+  '/js/auth.js?v=8.0',
   '/manifest.json'
 ];
 

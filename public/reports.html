@@ -224,7 +224,7 @@
         <button id="btn-export-csv" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
           <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i> Exportar CSV
         </button>
-        <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
+        <button id="btn-print-report" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition">
           <i data-lucide="printer" class="w-4 h-4 text-purple-400"></i> Imprimir Reporte
         </button>
       </div>
@@ -376,11 +376,14 @@
     </div>
   </div>
 
+  <!-- CONTENEDOR EXCLUSIVO PARA IMPRESIÓN / PDF HORIZONTAL (A4 LANDSCAPE) -->
+  <div id="print-attendance-sheet" class="hidden"></div>
+
   <!-- Scripts -->
-  <script src="/js/api.js?v=7.0"></script>
-  <script src="/js/auth.js?v=7.0"></script>
+  <script src="/js/api.js?v=8.0"></script>
+  <script src="/js/auth.js?v=8.0"></script>
   <script src="/js/exceljs.min.js"></script>
-  <script src="/js/reports.js?v=7.0"></script>
+  <script src="/js/reports.js?v=8.0"></script>
   <script>
     lucide.createIcons();
   </script>
