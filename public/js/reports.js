@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-query-report')?.addEventListener('click', executeReportQuery);
   document.getElementById('btn-export-excel')?.addEventListener('click', exportToExcel);
   document.getElementById('btn-export-csv')?.addEventListener('click', exportToCsv);
-  document.getElementById('btn-print-report')?.addEventListener('click', handleDailyExportPdf);
+  document.getElementById('btn-print-report')?.addEventListener('click', () => window.print());
 
   // Botones de reporte diario por áreas
   document.getElementById('btn-daily-export-excel')?.addEventListener('click', handleDailyExportExcel);
@@ -183,94 +183,446 @@ function calculateTotals(data) {
 }
 
 /**
- * Exportar a Excel (.xlsx) con Formato de Tabla y Fuente
+ * Exportar a Excel (.xlsx) con Formato de Tabla y Fuente - MÓDULO DE TAREO HISTÓRICO (16 COLUMNAS)
+ * Conserva todas las columnas canónicas de horas, horas extras 25%/35%, tardanzas y fórmulas nativas de suma.
  */
 async function exportToExcel() {
-  await handleDailyExportExcel();
+  if (!reportData || reportData.length === 0) {
+    showToast('Consultando registros para exportar...', 'info');
+    await executeReportQuery();
+  }
+
+  if (!reportData || reportData.length === 0) {
+    showToast('No hay datos de tareo para exportar en el rango seleccionado.', 'warning');
+    return;
+  }
+
+  const sortedData = [...reportData].sort((a, b) => {
+    const rankA = getAreaHierarchyRank(a.position_name, a.department_name);
+    const rankB = getAreaHierarchyRank(b.position_name, b.department_name);
+
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
+    return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+  });
+
+  const startDate = document.getElementById('rep-start-date')?.value || '';
+  const endDate = document.getElementById('rep-end-date')?.value || '';
+  const dateSuffix = (startDate && endDate) ? `${startDate}_al_${endDate}` : formatLocalYMD();
+  const fileName = `Tareo_Asistencia_${dateSuffix}.xlsx`;
+
+  if (window.ExcelJS) {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet('Tareo_General', {
+      views: [{ showGridLines: true }]
+    });
+
+    const columns = [
+      { name: 'N°', width: 6 },
+      { name: 'Fecha', width: 14 },
+      { name: 'Código Empleado', width: 16 },
+      { name: 'Documento', width: 16 },
+      { name: 'Apellidos y Nombres', width: 38 },
+      { name: 'Departamento / Área', width: 24 },
+      { name: 'Cargo / Puesto', width: 28 },
+      { name: 'Turno Asignado', width: 28 },
+      { name: 'Hora Entrada', width: 15 },
+      { name: 'Hora Salida', width: 15 },
+      { name: 'Total Horas Trabajadas', width: 22 },
+      { name: 'Horas Ordinarias', width: 18 },
+      { name: 'Horas Extras 25%', width: 18 },
+      { name: 'Horas Extras 35%', width: 18 },
+      { name: 'Minutos Tardanza', width: 16 },
+      { name: 'Estado Asistencia', width: 18 }
+    ];
+
+    const rows = sortedData.map((r, index) => {
+      const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+      
+      let totalHoras = 0;
+      if (r.first_entry_time && r.last_exit_time) {
+        const entryMs = new Date(r.first_entry_time).getTime();
+        let exitMs = new Date(r.last_exit_time).getTime();
+        if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+        const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
+        const netMin = Math.max(0, grossMin - 60); // Descuento 1h de refrigerio
+        totalHoras = Number((netMin / 60).toFixed(2));
+      } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
+        const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
+        totalHoras = Number((netMin / 60).toFixed(2));
+        if (totalHoras === 0) totalHoras = 10.50;
+      } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
+        totalHoras = 10.50; // Jornada completa computable estándar
+      }
+
+      const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
+      const exceso = Math.max(0, totalHoras - 8.00);
+      const he25 = Number(Math.min(2.00, exceso).toFixed(2));
+      const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
+
+      const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
+      const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+
+      return [
+        index + 1,
+        String(r.attendance_date || '').split('T')[0],
+        r.employee_code,
+        r.document_number,
+        `${r.last_name}, ${r.first_name}`.toUpperCase(),
+        r.department_name || '',
+        r.position_name || '',
+        shiftName,
+        formatTime(r.first_entry_time),
+        formatTime(r.last_exit_time),
+        totalHoras,
+        horasBase,
+        he25,
+        he35,
+        r.total_minutes_late || 0,
+        r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
+      ];
+    });
+
+    // Fila de encabezado
+    worksheet.addRow(columns.map(c => c.name));
+    const startDataRow = 2;
+    rows.forEach(r => worksheet.addRow(r));
+    const endDataRow = startDataRow + rows.length - 1;
+
+    // Fila de totales generales al final con fórmulas nativas SUM de Excel
+    const totalRow = worksheet.addRow([
+      '',
+      'TOTALES GENERALES',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      { formula: `SUM(K${startDataRow}:K${endDataRow})` }, // Suma Total Horas Trabajadas
+      { formula: `SUM(L${startDataRow}:L${endDataRow})` }, // Suma Horas Ordinarias
+      { formula: `SUM(M${startDataRow}:M${endDataRow})` }, // Suma Horas Extras 25%
+      { formula: `SUM(N${startDataRow}:N${endDataRow})` }, // Suma Horas Extras 35%
+      { formula: `SUM(O${startDataRow}:O${endDataRow})` }, // Suma Tardanzas
+      ''
+    ]);
+
+    columns.forEach((c, i) => {
+      worksheet.getColumn(i + 1).width = c.width;
+    });
+
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      row.height = rowNumber === 1 ? 26 : (rowNumber === endDataRow + 1 ? 24 : 20);
+
+      row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+        // Encabezado
+        if (rowNumber === 1) {
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+          cell.alignment = { vertical: 'middle', horizontal: colNumber >= 11 && colNumber <= 15 ? 'right' : 'center' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'medium', color: { argb: 'FF475569' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+          };
+          return;
+        }
+
+        // Fila de Totales Generales
+        if (rowNumber === endDataRow + 1) {
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+            bottom: { style: 'double', color: { argb: 'FFFFFFFF' } }
+          };
+          if (colNumber >= 11 && colNumber <= 15) {
+            cell.numFmt = '0.00';
+            cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          } else if (colNumber === 2) {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          }
+          return;
+        }
+
+        // Filas de Datos
+        cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF0F172A' } };
+        const isLeftAlign = colNumber === 5 || colNumber === 6 || colNumber === 7 || colNumber === 8;
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: (colNumber >= 11 && colNumber <= 15) ? 'right' : (isLeftAlign ? 'left' : 'center'),
+          wrapText: false
+        };
+
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+        };
+
+        // Formato numérico decimal puro (0.00)
+        if (colNumber >= 11 && colNumber <= 14) {
+          cell.numFmt = '0.00';
+          if (colNumber === 11) cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF047857' } };
+          if (colNumber === 13) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFB45309' } };
+          if (colNumber === 14) cell.font = { name: 'Calibri', size: 11, color: { argb: 'FFC2410C' } };
+        }
+
+        if (colNumber === 16) {
+          const val = String(cell.value || '');
+          if (val === 'PUNTUAL') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
+          } else if (val === 'TARDANZA') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFD97706' } };
+          } else if (val === 'FALTA') {
+            cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFDC2626' } };
+          }
+        }
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(downloadUrl);
+
+    showToast('¡Archivo Excel (.xlsx) de tareo general exportado exitosamente!', 'success');
+    return;
+  }
+
+  // Fallback con SheetJS si ExcelJS no está presente
+  let fTot = 0, fOrd = 0, f25 = 0, f35 = 0, fLate = 0;
+  const exportRows = sortedData.map((r, index) => {
+    const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+
+    let totalHoras = 0;
+    if (r.first_entry_time && r.last_exit_time) {
+      const entryMs = new Date(r.first_entry_time).getTime();
+      let exitMs = new Date(r.last_exit_time).getTime();
+      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+      const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
+      const netMin = Math.max(0, grossMin - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+    } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
+      const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+      if (totalHoras === 0) totalHoras = 10.50;
+    } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
+      totalHoras = 10.50;
+    }
+
+    const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
+    const exceso = Math.max(0, totalHoras - 8.00);
+    const he25 = Number(Math.min(2.00, exceso).toFixed(2));
+    const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
+    const late = Number(r.total_minutes_late || 0);
+
+    fTot += totalHoras;
+    fOrd += horasBase;
+    f25 += he25;
+    f35 += he35;
+    fLate += late;
+
+    const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
+    const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+
+    return {
+      'N°': index + 1,
+      'Fecha': String(r.attendance_date || '').split('T')[0],
+      'Código Empleado': r.employee_code,
+      'Documento': r.document_number,
+      'Apellidos y Nombres': `${r.last_name}, ${r.first_name}`.toUpperCase(),
+      'Departamento / Área': r.department_name || '',
+      'Cargo / Puesto': r.position_name || '',
+      'Turno Asignado': shiftName,
+      'Hora Entrada': formatTime(r.first_entry_time),
+      'Hora Salida': formatTime(r.last_exit_time),
+      'Total Horas Trabajadas': totalHoras,
+      'Horas Ordinarias': horasBase,
+      'Horas Extras 25%': he25,
+      'Horas Extras 35%': he35,
+      'Minutos Tardanza': late,
+      'Estado Asistencia': r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
+    };
+  });
+
+  exportRows.push({
+    'N°': '',
+    'Fecha': 'TOTALES GENERALES',
+    'Código Empleado': '',
+    'Documento': '',
+    'Apellidos y Nombres': '',
+    'Departamento / Área': '',
+    'Cargo / Puesto': '',
+    'Turno Asignado': '',
+    'Hora Entrada': '',
+    'Hora Salida': '',
+    'Total Horas Trabajadas': Number(fTot.toFixed(2)),
+    'Horas Ordinarias': Number(fOrd.toFixed(2)),
+    'Horas Extras 25%': Number(f25.toFixed(2)),
+    'Horas Extras 35%': Number(f35.toFixed(2)),
+    'Minutos Tardanza': fLate,
+    'Estado Asistencia': ''
+  });
+
+  if (window.XLSX) {
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tareo_Asistencia');
+    XLSX.writeFile(workbook, fileName);
+    showToast('¡Archivo Excel (.xlsx) exportado exitosamente!', 'success');
+  } else {
+    showToast('Biblioteca de exportación no disponible.', 'error');
+  }
 }
 window.exportToExcel = exportToExcel;
 
 /**
- * Exportar a CSV con las 9 columnas oficiales de Asistencia Diaria y Totales
+ * Exportar a CSV con las 16 columnas canónicas de Tareo Histórico y Totales
  */
-async function exportToCsv() {
-  const dateInput = document.getElementById('daily-rep-date')?.value || document.getElementById('rep-start-date')?.value || formatLocalYMD();
-  const areaSelect = document.getElementById('daily-rep-area')?.value || '';
-  const shiftSelect = document.getElementById('daily-rep-shift')?.value || '';
+function exportToCsv() {
+  if (!reportData || reportData.length === 0) {
+    showToast('No hay datos de tareo para exportar en el rango seleccionado.', 'warning');
+    return;
+  }
 
-  showToast('Generando archivo CSV oficial...', 'info');
+  const sortedData = [...reportData].sort((a, b) => {
+    const rankA = getAreaHierarchyRank(a.position_name, a.department_name);
+    const rankB = getAreaHierarchyRank(b.position_name, b.department_name);
+    if (rankA !== rankB) return rankA - rankB;
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
+    return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+  });
 
-  try {
-    const list = await fetchDailyAttendanceData(dateInput, areaSelect, shiftSelect);
-    if (list.length === 0) {
-      showToast('No hay datos para exportar con los filtros seleccionados.', 'warning');
-      return;
+  const startDate = document.getElementById('rep-start-date')?.value || '';
+  const endDate = document.getElementById('rep-end-date')?.value || '';
+  const dateSuffix = (startDate && endDate) ? `${startDate}_al_${endDate}` : formatLocalYMD();
+  const fileName = `Tareo_General_${dateSuffix}.csv`;
+
+  const headers = [
+    'N°',
+    'Fecha',
+    'Código Empleado',
+    'Documento',
+    'Apellidos y Nombres',
+    'Departamento / Área',
+    'Cargo / Puesto',
+    'Turno Asignado',
+    'Hora Entrada',
+    'Hora Salida',
+    'Total Horas Trabajadas',
+    'Horas Ordinarias',
+    'Horas Extras 25%',
+    'Horas Extras 35%',
+    'Minutos Tardanza',
+    'Estado Asistencia'
+  ];
+
+  let sumTot = 0, sumOrd = 0, sum25 = 0, sum35 = 0, sumLate = 0;
+  const csvRows = [headers.join(',')];
+
+  sortedData.forEach((r, idx) => {
+    const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+    
+    let totalHoras = 0;
+    if (r.first_entry_time && r.last_exit_time) {
+      const entryMs = new Date(r.first_entry_time).getTime();
+      let exitMs = new Date(r.last_exit_time).getTime();
+      if (exitMs <= entryMs) exitMs += 24 * 60 * 60 * 1000;
+      const grossMin = Math.max(0, Math.floor((exitMs - entryMs) / 60000));
+      const netMin = Math.max(0, grossMin - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+    } else if (r.total_minutes_worked && Number(r.total_minutes_worked) > 0) {
+      const netMin = Math.max(0, Number(r.total_minutes_worked) - 60);
+      totalHoras = Number((netMin / 60).toFixed(2));
+      if (totalHoras === 0) totalHoras = 10.50;
+    } else if (r.status === 'PRESENT' || r.status === 'COMPLETED' || r.status === 'PUNTUAL' || r.status === 'LATE') {
+      totalHoras = 10.50;
     }
 
-    const areaTag = areaSelect ? `_${areaSelect.replace(/\s+/g, '_')}` : '_Todas_Areas';
-    const shiftTag = shiftSelect ? (shiftSelect === 'nocturno' ? '_Turno_Nocturno' : '_Turno_Diurno') : '_Todos_Turnos';
-    const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}${shiftTag}.csv`;
+    const horasBase = Number(Math.min(8.00, totalHoras).toFixed(2));
+    const exceso = Math.max(0, totalHoras - 8.00);
+    const he25 = Number(Math.min(2.00, exceso).toFixed(2));
+    const he35 = Number(Math.max(0, totalHoras - 10.00).toFixed(2));
+    const late = Number(r.total_minutes_late || 0);
 
-    const headers = [
-      'Planta',
-      'Área',
-      'Tipo Doc',
-      'N° Documento',
-      'Código ID',
-      'Apellidos y Nombres',
-      'Cargo / Puesto',
-      'Turno Asignado',
-      'Estado Asistencia'
+    sumTot += totalHoras;
+    sumOrd += horasBase;
+    sum25 += he25;
+    sum35 += he35;
+    sumLate += late;
+
+    const isNight = String(r.shift_name || r.shift_type || '').toLowerCase().includes('noct') || String(r.shift_name || '').includes('19:30') || String(r.shift_id) === '2';
+    const shiftName = isNight ? 'Nocturno (19:30 - 07:00)' : 'Diurno (07:30 - 19:00)';
+
+    const row = [
+      idx + 1,
+      String(r.attendance_date || '').split('T')[0],
+      r.employee_code,
+      r.document_number,
+      `"${r.last_name}, ${r.first_name}"`,
+      `"${r.department_name || ''}"`,
+      `"${r.position_name || ''}"`,
+      `"${shiftName}"`,
+      formatTime(r.first_entry_time),
+      formatTime(r.last_exit_time),
+      totalHoras.toFixed(2),
+      horasBase.toFixed(2),
+      he25.toFixed(2),
+      he35.toFixed(2),
+      late,
+      r.status === 'PRESENT' ? 'PUNTUAL' : (r.status === 'LATE' ? 'TARDANZA' : (r.status === 'JUSTIFIED' ? 'JUSTIFICADO' : 'FALTA'))
     ];
+    csvRows.push(row.join(','));
+  });
 
-    let countAsistio = 0, countNoAsistio = 0;
-    const csvRows = [headers.join(',')];
+  // Fila de totales
+  csvRows.push([
+    '',
+    '"TOTALES GENERALES"',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    sumTot.toFixed(2),
+    sumOrd.toFixed(2),
+    sum25.toFixed(2),
+    sum35.toFixed(2),
+    sumLate,
+    ''
+  ].join(','));
 
-    list.forEach(item => {
-      if (item.estadoAsistencia === 'ASISTIO') countAsistio++;
-      else countNoAsistio++;
+  const blob = new Blob(["\uFEFF" + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', fileName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 
-      const row = [
-        `"${item.branch}"`,
-        `"${item.area}"`,
-        item.docType,
-        item.docNumber,
-        item.code,
-        `"${item.fullName}"`,
-        `"${item.position}"`,
-        `"${item.shiftName}"`,
-        item.estadoAsistencia
-      ];
-      csvRows.push(row.join(','));
-    });
-
-    // Fila de Totales Generales
-    csvRows.push([
-      '"TOTALES GENERALES"',
-      '""',
-      '""',
-      '""',
-      '""',
-      '""',
-      '""',
-      `"Total: ${list.length}"`,
-      `"ASISTIERON: ${countAsistio} | NO ASISTIERON: ${countNoAsistio}"`
-    ].join(','));
-
-    const blob = new Blob(["\uFEFF" + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    showToast('¡Archivo CSV descargado exitosamente!', 'success');
-  } catch (error) {
-    showToast('Error al exportar CSV: ' + error.message, 'error');
-  }
+  showToast('¡Archivo CSV de tareo general exportado exitosamente!', 'success');
 }
 window.exportToCsv = exportToCsv;
 
