@@ -738,7 +738,7 @@ async function fetchDailyAttendanceData(dateStr, selectedArea, selectedShift) {
     const lateMins = att ? (att.total_minutes_late || 0) : 0;
     const status = att ? att.status : 'ABSENT';
 
-    // Determinar con certeza legal y biométrica si asistió o no asistió (TRABAJÓ / NO TRABAJÓ)
+    // Determinar con certeza legal y biométrica si asistió o faltó
     const hasPunch = att && (
       Boolean(att.first_entry_time) ||
       att.status === 'PRESENT' ||
@@ -747,7 +747,7 @@ async function fetchDailyAttendanceData(dateStr, selectedArea, selectedShift) {
       att.status === 'JUSTIFIED' ||
       (att.total_minutes_worked && att.total_minutes_worked > 0)
     );
-    const estadoAsistencia = hasPunch ? 'ASISTIO' : 'NO TRABAJO';
+    const estadoAsistencia = hasPunch ? 'ASISTIO' : 'FALTA';
 
     return {
       id: emp.id,
@@ -829,7 +829,7 @@ async function handleDailyExportExcel() {
     const fileName = `Asistencia_Diaria_PECEPE_${dateInput}${areaTag}${shiftTag}.xlsx`;
 
     const countAsistio = list.filter(i => i.estadoAsistencia === 'ASISTIO').length;
-    const countNoAsistio = list.filter(i => i.estadoAsistencia === 'NO TRABAJO' || i.estadoAsistencia === 'NO ASISTIO').length;
+    const countFalta = list.filter(i => i.estadoAsistencia === 'FALTA' || i.estadoAsistencia !== 'ASISTIO').length;
 
     // Si ExcelJS está disponible, generar tabla nativa con fuentes Calibri 11 y tema institucional
     if (window.ExcelJS) {
@@ -882,7 +882,7 @@ async function handleDailyExportExcel() {
         '',
         '',
         `Total: ${list.length}`,
-        `ASISTIERON: ${countAsistio} | NO TRABAJARON: ${countNoAsistio}`
+        `ASISTIERON: ${countAsistio} | FALTAS: ${countFalta}`
       ]);
 
       columns.forEach((c, i) => {
@@ -1000,7 +1000,7 @@ async function handleDailyExportExcel() {
       'Apellidos y Nombres': '',
       'Cargo / Puesto': '',
       'Turno Asignado': `Total: ${list.length}`,
-      'Estado Asistencia': `ASISTIERON: ${countAsistio} | NO TRABAJARON: ${countNoAsistio}`
+      'Estado Asistencia': `ASISTIERON: ${countAsistio} | FALTAS: ${countFalta}`
     });
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -1017,7 +1017,7 @@ window.handleDailyExportExcel = handleDailyExportExcel;
 
 /**
  * Descargar / Imprimir Reporte PDF Oficial de Asistencia Diaria en Orientación Horizontal (Landscape)
- * Estructura limpia de confirmación de asistencia (ASISTIÓ / NO ASISTIÓ) y filtrado por turnos
+ * Estructura limpia de confirmación de asistencia (ASISTIÓ / FALTA) y filtrado por turnos
  */
 async function handleDailyExportPdf(e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -1046,14 +1046,14 @@ async function handleDailyExportPdf(e) {
 
     const totalCount = list.length;
     const countAsistio = list.filter(i => i.estadoAsistencia === 'ASISTIO').length;
-    const countNoAsistio = list.filter(i => i.estadoAsistencia === 'NO TRABAJO' || i.estadoAsistencia === 'NO ASISTIO').length;
+    const countFalta = list.filter(i => i.estadoAsistencia === 'FALTA' || i.estadoAsistencia !== 'ASISTIO').length;
     const percentAsistencia = totalCount > 0 ? ((countAsistio / totalCount) * 100).toFixed(1) : '0.0';
 
     const rowsHtml = list.map((item, index) => {
       const isNight = item.isNight;
       const shiftShort = isNight ? '🌙 Nocturno (19:30 - 07:00)' : '☀️ Diurno (07:30 - 19:00)';
       const isAsistio = item.estadoAsistencia === 'ASISTIO';
-      const statusText = isAsistio ? '✔ ASISTIÓ' : '✖ NO TRABAJÓ';
+      const statusText = isAsistio ? 'ASISTIÓ' : 'FALTA';
       const statusColor = isAsistio ? '#059669' : '#dc2626';
       const statusBg = isAsistio ? '#ecfdf5' : '#fef2f2';
 
@@ -1068,7 +1068,7 @@ async function handleDailyExportPdf(e) {
           <td style="font-weight: 700; text-transform: uppercase;">${item.fullName}</td>
           <td>${item.position}</td>
           <td style="text-align: center; font-size: 7pt; font-weight: 600; color: ${isNight ? '#6b21a8' : '#0369a1'};">${shiftShort}</td>
-          <td style="text-align: center; font-weight: 900; color: ${statusColor}; background: ${statusBg}; font-size: 7.5pt;">${statusText}</td>
+          <td style="text-align: center; font-weight: 900; color: ${statusColor}; background: ${statusBg}; font-size: 7.5pt; letter-spacing: 0.5px;">${statusText}</td>
         </tr>
       `;
     }).join('');
@@ -1109,8 +1109,8 @@ async function handleDailyExportPdf(e) {
           <span style="font-size: 8.5pt; font-weight: 900; color: #059669;">${countAsistio}</span>
         </div>
         <div style="flex: 1; background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; text-align: center;">
-          <span style="font-size: 6.8pt; font-weight: 800; color: #991b1b; text-transform: uppercase;">No Trabajaron: </span>
-          <span style="font-size: 8.5pt; font-weight: 900; color: #dc2626;">${countNoAsistio}</span>
+          <span style="font-size: 6.8pt; font-weight: 800; color: #991b1b; text-transform: uppercase;">Faltas: </span>
+          <span style="font-size: 8.5pt; font-weight: 900; color: #dc2626;">${countFalta}</span>
         </div>
         <div style="flex: 1; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; padding: 4px 8px; text-align: center;">
           <span style="font-size: 6.8pt; font-weight: 800; color: #0369a1; text-transform: uppercase;">% Asistencia: </span>
@@ -1141,7 +1141,7 @@ async function handleDailyExportPdf(e) {
             <td colspan="7" style="text-align: center; font-weight: 900; letter-spacing: 1px;">TOTALES GENERALES</td>
             <td style="text-align: center; font-weight: bold;">Total: ${totalCount}</td>
             <td colspan="2" style="text-align: center; font-weight: 900;">
-              <span style="color: #10b981;">ASISTIERON: ${countAsistio}</span> &nbsp;|&nbsp; <span style="color: #ef4444;">NO TRABAJARON: ${countNoAsistio}</span>
+              <span style="color: #10b981;">ASISTIERON: ${countAsistio}</span> &nbsp;|&nbsp; <span style="color: #ef4444;">FALTAS: ${countFalta}</span>
             </td>
           </tr>
         </tfoot>
