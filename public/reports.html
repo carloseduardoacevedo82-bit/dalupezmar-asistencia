@@ -19,7 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="/js/exceljs.min.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=9.4">
+  <link rel="stylesheet" href="/css/styles.css?v=9.5">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
@@ -143,19 +143,32 @@
 
     <!-- PANEL DE FILTROS AVANZADOS DE TAREO HISTÓRICO -->
     <div class="glass-panel p-6 rounded-3xl border border-slate-800 space-y-4 no-print">
-      <h2 class="text-base font-bold text-white flex items-center gap-2">
-        <i data-lucide="filter" class="w-5 h-5 text-cyan-400"></i> Consulta Histórica por Rango de Fechas
-      </h2>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="history" class="w-5 h-5 text-cyan-400"></i> Consulta Histórica por Rango de Fechas
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Auditoría e inspección de tareos anteriores. La tabla principal muestra por defecto y en vivo el día actual.</p>
+        </div>
+
+        <!-- Botones de Selección Rápida de Períodos -->
+        <div class="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+          <button type="button" id="btn-quick-yesterday" class="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">Ayer</button>
+          <button type="button" id="btn-quick-last7" class="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">Últimos 7 Días</button>
+          <button type="button" id="btn-quick-thismonth" class="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">Este Mes</button>
+          <button type="button" id="btn-quick-lastmonth" class="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer">Mes Anterior</button>
+        </div>
+      </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha Inicio</label>
-          <input type="date" id="rep-start-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+          <input type="date" id="rep-start-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold">
         </div>
 
         <div>
           <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fecha Fin</label>
-          <input type="date" id="rep-end-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+          <input type="date" id="rep-end-date" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold">
         </div>
 
         <div>
@@ -176,9 +189,9 @@
           </select>
         </div>
 
-        <div class="flex items-end">
-          <button id="btn-query-report" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition">
-            <i data-lucide="search" class="w-4 h-4"></i> Consultar Rango
+        <div class="flex items-end gap-2">
+          <button id="btn-query-report" class="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition cursor-pointer">
+            <i data-lucide="search" class="w-4 h-4"></i> Consultar Histórico
           </button>
         </div>
       </div>
@@ -188,7 +201,10 @@
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
       <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
         <div>
-          <p class="text-[11px] text-slate-400 font-bold uppercase">Registros Encontrados</p>
+          <div class="flex items-center gap-2">
+            <p class="text-[11px] text-slate-400 font-bold uppercase">Registros Encontrados</p>
+            <span id="tot-period-badge" class="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">HOY</span>
+          </div>
           <p id="tot-records" class="text-2xl font-black text-white font-mono mt-0.5">0</p>
         </div>
         <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
@@ -219,11 +235,32 @@
 
     <!-- BOTONES DE EXPORTACIÓN Y ACCIONES -->
     <div class="flex flex-wrap items-center justify-between gap-4 no-print">
-      <div class="flex items-center gap-3">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i> Tabla Consolidada de Tareo
-        </h3>
-        <button id="btn-open-manual-att" class="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 transition">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="flex items-center gap-2.5">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i> Tabla Consolidada de Tareo
+          </h3>
+          <!-- Badge de Estado de Modo -->
+          <div id="tareo-mode-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="tareo-mode-text">HOY</span>
+          </div>
+        </div>
+
+        <!-- Botón refrescar día actual -->
+        <button id="btn-refresh-today" title="Sincronizar datos de hoy" class="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border border-slate-700/70 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer active:scale-95">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Actualizar</span>
+          <span id="sync-time-indicator" class="text-[10px] text-slate-400 font-mono hidden md:inline"></span>
+        </button>
+
+        <!-- Botón Volver a Hoy (visible en modo histórico) -->
+        <button id="btn-return-today" class="hidden px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shadow-lg shadow-emerald-600/25 transition cursor-pointer active:scale-95">
+          <i data-lucide="calendar-check" class="w-4 h-4"></i> Volver al Día de Hoy
+        </button>
+
+        <!-- Botón registrar asistencia manual -->
+        <button id="btn-open-manual-att" class="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
           <i data-lucide="plus-circle" class="w-4 h-4"></i> Registrar Asistencia Manual
         </button>
       </div>
@@ -406,10 +443,10 @@
   <div id="print-attendance-sheet" class="hidden"></div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=9.4"></script>
-  <script src="/js/auth.js?v=9.4"></script>
+  <script src="/js/api.js?v=9.5"></script>
+  <script src="/js/auth.js?v=9.5"></script>
   <script src="/js/exceljs.min.js"></script>
-  <script src="/js/reports.js?v=9.4"></script>
+  <script src="/js/reports.js?v=9.5"></script>
   <script>
     lucide.createIcons();
   </script>

@@ -3,12 +3,25 @@
  */
 let reportData = [];
 let isPdfExporting = false;
+let currentTareoMode = 'TODAY'; // 'TODAY' | 'HISTORICAL'
+let activeTareoDate = formatLocalYMD(new Date());
+let todayPollingTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initReportDates();
 
-  // Vinculación segura y única de botones de exportación y acciones
-  document.getElementById('btn-query-report')?.addEventListener('click', executeReportQuery);
+  // Vinculación de eventos de consulta y cambio de modo
+  document.getElementById('btn-query-report')?.addEventListener('click', executeHistoricalQuery);
+  document.getElementById('btn-refresh-today')?.addEventListener('click', () => {
+    showToast('Actualizando tareo del día...', 'info');
+    loadTodayTareo(false);
+  });
+  document.getElementById('btn-return-today')?.addEventListener('click', switchToTodayMode);
+  document.getElementById('btn-filter-back-today')?.addEventListener('click', switchToTodayMode);
+
+  initQuickDateButtons();
+
+  // Exportaciones y Acciones
   document.getElementById('btn-export-excel')?.addEventListener('click', exportToExcel);
   document.getElementById('btn-export-csv')?.addEventListener('click', exportToCsv);
   document.getElementById('btn-print-report')?.addEventListener('click', (e) => {
@@ -18,6 +31,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pc) pc.classList.add('hidden');
     const dElem = document.getElementById('tareo-print-date');
     if (dElem) dElem.textContent = new Date().toLocaleString('es-PE');
+
+    const isToday = currentTareoMode === 'TODAY';
+    const startDate = document.getElementById('rep-start-date')?.value || '';
+    const endDate = document.getElementById('rep-end-date')?.value || '';
+    const printHeaderH2 = document.querySelector('#tareo-print-header h2');
+    if (printHeaderH2) {
+      printHeaderH2.textContent = isToday
+        ? `REPORTE CONSOLIDADO DE TAREO DEL DÍA (${formatDisplayDate(activeTareoDate)})`
+        : `REPORTE CONSOLIDADO DE TAREO HISTÓRICO (${startDate} AL ${endDate})`;
+    }
+
     window.print();
   });
 
@@ -29,7 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Cargas iniciales asíncronas independientes
   loadDepartmentsFilter().catch(e => console.error('Error cargando departamentos:', e));
-  executeReportQuery().catch(e => console.error('Error consulta inicial:', e));
+
+  // CARGA INICIAL POR DEFECTO: Única y exclusivamente el DÍA ACTUAL
+  loadTodayTareo(false).then(() => {
+    startTodayPolling();
+  }).catch(e => console.error('Error consulta inicial:', e));
 });
 
 window.addEventListener('afterprint', () => {
@@ -46,17 +74,256 @@ function formatLocalYMD(d = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function formatDisplayDate(ymdStr) {
+  if (!ymdStr) return '';
+  const clean = String(ymdStr).split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length < 3) return clean;
+  const [year, month, day] = parts.map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString('es-PE', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).toUpperCase();
+}
+
 function initReportDates() {
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  const todayStr = formatLocalYMD(today);
+  activeTareoDate = todayStr;
+
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
   const startInput = document.getElementById('rep-start-date');
   const endInput = document.getElementById('rep-end-date');
   const dailyDateInput = document.getElementById('daily-rep-date');
 
-  if (startInput) startInput.value = formatLocalYMD(firstDay);
-  if (endInput) endInput.value = formatLocalYMD(today);
-  if (dailyDateInput) dailyDateInput.value = formatLocalYMD(today);
+  // En el panel histórico se preconfigura el mes en curso para facilitar consultas
+  if (startInput) startInput.value = formatLocalYMD(firstDayOfMonth);
+  if (endInput) endInput.value = todayStr;
+  if (dailyDateInput) dailyDateInput.value = todayStr;
+}
+
+function initQuickDateButtons() {
+  document.getElementById('btn-quick-yesterday')?.addEventListener('click', () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = formatLocalYMD(yesterday);
+    const startInput = document.getElementById('rep-start-date');
+    const endInput = document.getElementById('rep-end-date');
+    if (startInput) startInput.value = yStr;
+    if (endInput) endInput.value = yStr;
+    executeHistoricalQuery();
+  });
+
+  document.getElementById('btn-quick-last7')?.addEventListener('click', () => {
+    const today = new Date();
+    const past7 = new Date();
+    past7.setDate(past7.getDate() - 7);
+    const startInput = document.getElementById('rep-start-date');
+    const endInput = document.getElementById('rep-end-date');
+    if (startInput) startInput.value = formatLocalYMD(past7);
+    if (endInput) endInput.value = formatLocalYMD(today);
+    executeHistoricalQuery();
+  });
+
+  document.getElementById('btn-quick-thismonth')?.addEventListener('click', () => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startInput = document.getElementById('rep-start-date');
+    const endInput = document.getElementById('rep-end-date');
+    if (startInput) startInput.value = formatLocalYMD(firstDay);
+    if (endInput) endInput.value = formatLocalYMD(today);
+    executeHistoricalQuery();
+  });
+
+  document.getElementById('btn-quick-lastmonth')?.addEventListener('click', () => {
+    const today = new Date();
+    const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    const startInput = document.getElementById('rep-start-date');
+    const endInput = document.getElementById('rep-end-date');
+    if (startInput) startInput.value = formatLocalYMD(firstDayLastMonth);
+    if (endInput) endInput.value = formatLocalYMD(lastDayLastMonth);
+    executeHistoricalQuery();
+  });
+}
+
+function updateTareoModeUI(mode, dateInfo) {
+  const modeBadge = document.getElementById('tareo-mode-badge');
+  const btnReturnToday = document.getElementById('btn-return-today');
+  const btnFilterBackToday = document.getElementById('btn-filter-back-today');
+  const totPeriodBadge = document.getElementById('tot-period-badge');
+
+  if (mode === 'TODAY') {
+    if (modeBadge) {
+      modeBadge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+      modeBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span id="tareo-mode-text">HOY (${dateInfo})</span>`;
+    }
+    if (totPeriodBadge) {
+      totPeriodBadge.className = 'px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+      totPeriodBadge.textContent = 'HOY';
+    }
+    if (btnReturnToday) btnReturnToday.classList.add('hidden');
+    if (btnFilterBackToday) btnFilterBackToday.classList.add('hidden');
+  } else {
+    if (modeBadge) {
+      modeBadge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-500/15 text-cyan-300 border border-blue-500/30';
+      modeBadge.innerHTML = `<i data-lucide="history" class="w-3.5 h-3.5 text-cyan-400"></i><span id="tareo-mode-text">HISTÓRICO (${dateInfo})</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
+    if (totPeriodBadge) {
+      totPeriodBadge.className = 'px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-500/15 text-cyan-300 border border-blue-500/30';
+      totPeriodBadge.textContent = 'HISTÓRICO';
+    }
+    if (btnReturnToday) btnReturnToday.classList.remove('hidden');
+    if (btnFilterBackToday) btnFilterBackToday.classList.remove('hidden');
+  }
+}
+
+function updateSyncTimestamp() {
+  const syncElem = document.getElementById('sync-time-indicator');
+  if (syncElem) {
+    const now = new Date();
+    syncElem.textContent = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+}
+
+function startTodayPolling() {
+  stopTodayPolling();
+  todayPollingTimer = setInterval(() => {
+    if (document.hidden) return;
+    if (currentTareoMode === 'TODAY') {
+      const todayStr = formatLocalYMD(new Date());
+      // Detección automática de cambio de día (medianoche)
+      if (todayStr !== activeTareoDate) {
+        activeTareoDate = todayStr;
+        const dailyDateInput = document.getElementById('daily-rep-date');
+        if (dailyDateInput) dailyDateInput.value = todayStr;
+      }
+      loadTodayTareo(true);
+    }
+  }, 30000); // Polling suave cada 30s
+}
+
+function stopTodayPolling() {
+  if (todayPollingTimer) {
+    clearInterval(todayPollingTimer);
+    todayPollingTimer = null;
+  }
+}
+
+/**
+ * Cargar Tareo exclusivo del DÍA ACTUAL
+ */
+async function loadTodayTareo(silent = false) {
+  const currentTodayStr = formatLocalYMD(new Date());
+  activeTareoDate = currentTodayStr;
+  currentTareoMode = 'TODAY';
+
+  updateTareoModeUI('TODAY', formatDisplayDate(currentTodayStr));
+
+  try {
+    if (!silent && (!reportData || reportData.length === 0)) {
+      const tbody = document.getElementById('report-table-body');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="13" class="px-6 py-8 text-center text-slate-500 font-sans"><div class="inline-block animate-spin w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full mb-2"></div><br>Cargando información del día actual (${formatDisplayDate(currentTodayStr)})...</td></tr>`;
+      }
+    }
+
+    const res = await api.attendance.getReport({
+      start_date: currentTodayStr,
+      end_date: currentTodayStr
+    });
+
+    if (res && res.data) {
+      reportData = res.data;
+      renderReportTable(reportData);
+      calculateTotals(reportData);
+      updateSyncTimestamp();
+    }
+  } catch (error) {
+    if (!silent) {
+      showToast('Error al consultar tareo del día actual: ' + error.message, 'error');
+    }
+  }
+}
+
+/**
+ * Ejecutar Consulta Histórica por Rango de Fechas
+ */
+async function executeHistoricalQuery() {
+  const startDate = document.getElementById('rep-start-date')?.value;
+  const endDate = document.getElementById('rep-end-date')?.value;
+  const deptId = document.getElementById('rep-filter-dept')?.value;
+  const status = document.getElementById('rep-filter-status')?.value;
+
+  if (!startDate || !endDate) {
+    showToast('Selecciona la fecha de inicio y fin para la consulta histórica.', 'warning');
+    return;
+  }
+
+  currentTareoMode = 'HISTORICAL';
+  stopTodayPolling(); // Pausar polling de hoy para no pisar la consulta histórica
+
+  updateTareoModeUI('HISTORICAL', `${startDate} al ${endDate}`);
+
+  const params = {
+    start_date: startDate,
+    end_date: endDate
+  };
+  if (deptId) params.department_id = deptId;
+  if (status) params.status = status;
+
+  try {
+    const tbody = document.getElementById('report-table-body');
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="13" class="px-6 py-8 text-center text-slate-500 font-sans"><div class="inline-block animate-spin w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full mb-2"></div><br>Consultando registros históricos del ${startDate} al ${endDate}...</td></tr>`;
+    }
+
+    const res = await api.attendance.getReport(params);
+    if (res && res.data) {
+      reportData = res.data;
+      renderReportTable(reportData);
+      calculateTotals(reportData);
+      showToast(`Consulta histórica cargada: ${reportData.length} registros.`, 'info');
+    }
+  } catch (error) {
+    showToast('Error al consultar tareo histórico: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Regresar al Modo Día Actual (Hoy)
+ */
+async function switchToTodayMode() {
+  currentTareoMode = 'TODAY';
+  await loadTodayTareo(false);
+  startTodayPolling();
+  showToast('Mostrando Tareo del Día Actual en tiempo real.', 'success');
+}
+
+/**
+ * Refrescar según el modo activo
+ */
+async function refreshCurrentTareoView() {
+  if (currentTareoMode === 'TODAY') {
+    await loadTodayTareo(true);
+  } else {
+    await executeHistoricalQuery();
+  }
+}
+
+/**
+ * Alias de compatibilidad
+ */
+async function executeReportQuery() {
+  if (currentTareoMode === 'TODAY') {
+    return loadTodayTareo();
+  }
+  return executeHistoricalQuery();
 }
 
 async function loadDepartmentsFilter() {
@@ -71,33 +338,6 @@ async function loadDepartmentsFilter() {
     }
   } catch (e) {
     console.warn(e);
-  }
-}
-
-/**
- * Consultar reporte de tareo según filtros
- */
-async function executeReportQuery() {
-  const startDate = document.getElementById('rep-start-date')?.value;
-  const endDate = document.getElementById('rep-end-date')?.value;
-  const deptId = document.getElementById('rep-filter-dept')?.value;
-  const status = document.getElementById('rep-filter-status')?.value;
-
-  const params = {};
-  if (startDate) params.start_date = startDate;
-  if (endDate) params.end_date = endDate;
-  if (deptId) params.department_id = deptId;
-  if (status) params.status = status;
-
-  try {
-    const res = await api.attendance.getReport(params);
-    if (res && res.data) {
-      reportData = res.data;
-      renderReportTable(reportData);
-      calculateTotals(reportData);
-    }
-  } catch (error) {
-    showToast('Error al consultar tareo: ' + error.message, 'error');
   }
 }
 
@@ -230,17 +470,21 @@ async function exportToExcel() {
     return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
   });
 
+  const isToday = currentTareoMode === 'TODAY';
   const startDate = document.getElementById('rep-start-date')?.value || '';
   const endDate = document.getElementById('rep-end-date')?.value || '';
-  const dateSuffix = (startDate && endDate) ? `${startDate}_al_${endDate}` : formatLocalYMD();
-  const fileName = `Tareo_Asistencia_${dateSuffix}.xlsx`;
+  const dateSuffix = isToday 
+    ? (activeTareoDate || formatLocalYMD(new Date()))
+    : ((startDate && endDate) ? `${startDate}_al_${endDate}` : formatLocalYMD());
+  const fileName = isToday ? `Tareo_Diario_${dateSuffix}.xlsx` : `Tareo_Historico_${dateSuffix}.xlsx`;
+  const sheetName = isToday ? 'Tareo_Diario' : 'Tareo_Historico';
 
   if (window.ExcelJS) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.';
     workbook.created = new Date();
 
-    const worksheet = workbook.addWorksheet('Tareo_General', {
+    const worksheet = workbook.addWorksheet(sheetName, {
       views: [{ showGridLines: true }]
     });
 
@@ -506,7 +750,7 @@ async function exportToExcel() {
   if (window.XLSX) {
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tareo_Asistencia');
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     XLSX.writeFile(workbook, fileName);
     showToast('¡Archivo Excel (.xlsx) exportado exitosamente!', 'success');
   } else {
@@ -533,10 +777,13 @@ function exportToCsv() {
     return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
   });
 
+  const isToday = currentTareoMode === 'TODAY';
   const startDate = document.getElementById('rep-start-date')?.value || '';
   const endDate = document.getElementById('rep-end-date')?.value || '';
-  const dateSuffix = (startDate && endDate) ? `${startDate}_al_${endDate}` : formatLocalYMD();
-  const fileName = `Tareo_General_${dateSuffix}.csv`;
+  const dateSuffix = isToday 
+    ? (activeTareoDate || formatLocalYMD(new Date()))
+    : ((startDate && endDate) ? `${startDate}_al_${endDate}` : formatLocalYMD());
+  const fileName = isToday ? `Tareo_Diario_${dateSuffix}.csv` : `Tareo_Historico_${dateSuffix}.csv`;
 
   const headers = [
     'N°',
