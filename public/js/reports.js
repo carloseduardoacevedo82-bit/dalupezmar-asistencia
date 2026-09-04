@@ -111,10 +111,10 @@ function renderReportTable(data) {
   }
 
   const statusTags = {
-    PRESENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PUNTUAL</span>',
-    LATE: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20">TARDANZA</span>',
-    JUSTIFIED: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-400 border border-purple-500/20">JUSTIFICADO</span>',
-    ABSENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20">FALTA</span>'
+    PRESENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 print:bg-emerald-50 print:text-emerald-900 print:border-emerald-700">PUNTUAL</span>',
+    LATE: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/20 print:bg-amber-50 print:text-amber-900 print:border-amber-700">TARDANZA</span>',
+    JUSTIFIED: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-400 border border-purple-500/20 print:bg-purple-50 print:text-purple-900 print:border-purple-700">JUSTIFICADO</span>',
+    ABSENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20 print:bg-rose-50 print:text-rose-900 print:border-rose-700">FALTA</span>'
   };
 
   tbody.innerHTML = data.map(row => {
@@ -143,31 +143,32 @@ function renderReportTable(data) {
 
     const isNight = String(row.shift_name || row.shift_type || '').toLowerCase().includes('noct') || String(row.shift_name || '').includes('19:30') || String(row.shift_id) === '2';
     const shiftBadge = isNight
-      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-400 border border-purple-500/20">🌙 Nocturno</span>'
-      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20">☀️ Diurno</span>';
+      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/10 text-purple-400 border border-purple-500/20 print:bg-purple-50 print:text-purple-900 print:border-purple-600">🌙 Nocturno</span>'
+      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20 print:bg-sky-50 print:text-sky-900 print:border-sky-600">☀️ Diurno</span>';
 
     const tardanzaHoras = Number(((row.total_minutes_late || 0) / 60).toFixed(2));
+    const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || 'COLABORADOR';
 
     return `
       <tr class="hover:bg-slate-900/40 transition text-xs">
-        <td class="px-4 py-3 font-bold text-slate-200">${String(row.attendance_date || '').split('T')[0]}</td>
+        <td class="px-4 py-3 font-bold text-slate-200 print:text-black whitespace-nowrap">${String(row.attendance_date || '').split('T')[0]}</td>
         <td class="px-4 py-3 font-sans">
-          <p class="font-extrabold text-white text-xs uppercase">${row.first_name} ${row.last_name}</p>
-          <p class="text-[10px] text-slate-400 font-mono">${row.employee_code} • DNI ${row.document_number}</p>
+          <p class="font-extrabold text-white print:text-black text-xs uppercase tracking-wide leading-tight">${fullName}</p>
+          <p class="text-[10px] text-slate-400 print:text-slate-700 font-mono font-bold">${row.employee_code || ''} • DNI ${row.document_number || ''}</p>
         </td>
         <td class="px-4 py-3 font-sans">
-          <p class="font-bold text-slate-300 text-xs">${row.department_name || 'General'}</p>
-          <p class="text-[10px] text-cyan-400 font-semibold">${row.position_name || '-'}</p>
+          <p class="font-bold text-slate-300 print:text-slate-900 text-xs">${row.department_name || 'General'}</p>
+          <p class="text-[10px] text-cyan-400 print:text-sky-900 font-bold">${row.position_name || '-'}</p>
         </td>
-        <td class="px-4 py-3 text-center">${shiftBadge}</td>
-        <td class="px-4 py-3 text-center text-cyan-300 font-black">${formatTime(row.first_entry_time)}</td>
-        <td class="px-4 py-3 text-center text-cyan-300 font-black">${formatTime(row.last_exit_time)}</td>
-        <td class="px-4 py-3 text-right text-emerald-400 font-black">${totalHoras.toFixed(2)}</td>
-        <td class="px-4 py-3 text-right text-slate-300 font-mono">${horasBase.toFixed(2)}</td>
-        <td class="px-4 py-3 text-right text-amber-400 font-bold font-mono">${he25.toFixed(2)}</td>
-        <td class="px-4 py-3 text-right text-orange-400 font-bold font-mono">${he35.toFixed(2)}</td>
-        <td class="px-4 py-3 text-right text-amber-400 font-mono font-bold">${tardanzaHoras.toFixed(2)}</td>
-        <td class="px-4 py-3 text-center font-sans">
+        <td class="px-4 py-3 text-center whitespace-nowrap">${shiftBadge}</td>
+        <td class="px-4 py-3 text-center text-cyan-300 print:text-black font-black whitespace-nowrap">${formatTime(row.first_entry_time)}</td>
+        <td class="px-4 py-3 text-center text-cyan-300 print:text-black font-black whitespace-nowrap">${formatTime(row.last_exit_time)}</td>
+        <td class="px-4 py-3 text-right text-emerald-400 print:text-emerald-950 font-black whitespace-nowrap">${totalHoras.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-slate-300 print:text-black font-mono font-bold whitespace-nowrap">${horasBase.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-amber-400 print:text-black font-bold font-mono whitespace-nowrap">${he25.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-orange-400 print:text-black font-bold font-mono whitespace-nowrap">${he35.toFixed(2)}</td>
+        <td class="px-4 py-3 text-right text-amber-400 print:text-black font-mono font-bold whitespace-nowrap">${tardanzaHoras.toFixed(2)}</td>
+        <td class="px-4 py-3 text-center font-sans whitespace-nowrap">
           ${statusTags[row.status] || row.status}
         </td>
         <td class="px-4 py-3 text-center no-print">

@@ -19,7 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="/js/exceljs.min.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=9.2">
+  <link rel="stylesheet" href="/css/styles.css?v=9.3">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
@@ -261,18 +261,18 @@
         <table class="w-full text-left text-xs text-slate-300">
           <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
             <tr>
-              <th class="px-4 py-3.5">Fecha</th>
-              <th class="px-4 py-3.5">Colaborador</th>
-              <th class="px-4 py-3.5">Área / Cargo</th>
-              <th class="px-4 py-3.5 text-center">Turno Asignado</th>
-              <th class="px-4 py-3.5 text-center">Entrada</th>
-              <th class="px-4 py-3.5 text-center">Salida</th>
-              <th class="px-4 py-3.5 text-right">Total Horas</th>
-              <th class="px-4 py-3.5 text-right">Horas Ord.</th>
-              <th class="px-4 py-3.5 text-right">HE 25%</th>
-              <th class="px-4 py-3.5 text-right">HE 35%</th>
-              <th class="px-4 py-3.5 text-right">Tardanza (h)</th>
-              <th class="px-4 py-3.5 text-center">Estado</th>
+              <th class="px-4 py-3.5 whitespace-nowrap">Fecha</th>
+              <th class="px-4 py-3.5 min-w-[180px]">Colaborador</th>
+              <th class="px-4 py-3.5 min-w-[130px]">Área / Cargo</th>
+              <th class="px-4 py-3.5 text-center whitespace-nowrap">Turno Asignado</th>
+              <th class="px-4 py-3.5 text-center whitespace-nowrap">Entrada</th>
+              <th class="px-4 py-3.5 text-center whitespace-nowrap">Salida</th>
+              <th class="px-4 py-3.5 text-right whitespace-nowrap">Total Horas</th>
+              <th class="px-4 py-3.5 text-right whitespace-nowrap">Horas Ord.</th>
+              <th class="px-4 py-3.5 text-right whitespace-nowrap">HE 25%</th>
+              <th class="px-4 py-3.5 text-right whitespace-nowrap">HE 35%</th>
+              <th class="px-4 py-3.5 text-right whitespace-nowrap">Tardanza (h)</th>
+              <th class="px-4 py-3.5 text-center whitespace-nowrap">Estado</th>
               <th class="px-4 py-3.5 text-center no-print">Acciones</th>
             </tr>
           </thead>
@@ -406,10 +406,10 @@
   <div id="print-attendance-sheet" class="hidden"></div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=9.2"></script>
-  <script src="/js/auth.js?v=9.2"></script>
+  <script src="/js/api.js?v=9.3"></script>
+  <script src="/js/auth.js?v=9.3"></script>
   <script src="/js/exceljs.min.js"></script>
-  <script src="/js/reports.js?v=9.2"></script>
+  <script src="/js/reports.js?v=9.3"></script>
   <script>
     lucide.createIcons();
   </script>
