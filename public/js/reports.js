@@ -1180,9 +1180,20 @@ function initAttendanceModals() {
     const statusVal = document.getElementById('edit-att-status')?.value;
 
     const row = reportData.find(r => r.id == id);
-    const dateStr = row ? row.attendance_date : new Date().toISOString().split('T')[0];
+    let cleanDate = new Date().toISOString().split('T')[0];
+    if (row && row.attendance_date) {
+      if (typeof row.attendance_date === 'string') {
+        cleanDate = row.attendance_date.split('T')[0];
+      } else if (row.attendance_date instanceof Date) {
+        cleanDate = row.attendance_date.toISOString().split('T')[0];
+      }
+    }
 
-    const toIso = (timeStr) => timeStr ? `${dateStr}T${timeStr}:00` : null;
+    const toIso = (timeStr) => {
+      if (!timeStr) return null;
+      const t = timeStr.trim();
+      return `${cleanDate}T${t.length === 5 ? t + ':00' : t}`;
+    };
 
     try {
       showToast('Guardando modificaciones...', 'info');
@@ -1216,13 +1227,18 @@ function initAttendanceModals() {
       return;
     }
 
-    const toIso = (timeStr) => timeStr ? `${dateVal}T${timeStr}:00` : null;
+    const cleanManualDate = dateVal ? String(dateVal).split('T')[0] : new Date().toISOString().split('T')[0];
+    const toIso = (timeStr) => {
+      if (!timeStr) return null;
+      const t = timeStr.trim();
+      return `${cleanManualDate}T${t.length === 5 ? t + ':00' : t}`;
+    };
 
     try {
       showToast('Registrando asistencia manual...', 'info');
       await api.attendance.createManualRecord({
         employee_id: empId,
-        attendance_date: dateVal,
+        attendance_date: cleanManualDate,
         first_entry_time: toIso(entryTimeVal),
         last_exit_time: toIso(exitTimeVal),
         status: statusVal
@@ -1267,7 +1283,12 @@ window.openEditAttendanceModal = function(id) {
   document.getElementById('edit-att-id').value = row.id;
   document.getElementById('edit-att-emp-name').textContent = `${row.first_name} ${row.last_name} (${row.employee_code} • DNI ${row.document_number})`;
 
-  const getTime = (iso) => iso ? new Date(iso).toTimeString().substring(0, 5) : '';
+  const getTime = (iso) => {
+    if (!iso) return '';
+    const str = String(iso).trim();
+    const match = str.match(/(\d{1,2}:\d{2})(?::\d{2})?/);
+    return match ? match[1] : '';
+  };
 
   document.getElementById('edit-att-entry').value = getTime(row.first_entry_time) || '07:00';
   document.getElementById('edit-att-exit').value = getTime(row.last_exit_time) || '19:00';

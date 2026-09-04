@@ -528,7 +528,7 @@ const punch = async (req, res) => {
 const updateAttendanceRecord = async (req, res) => {
   try {
     const { id } = req.params;
-    const { first_entry_time, lunch_start_time, lunch_end_time, last_exit_time, status, total_minutes_worked } = req.body;
+    let { first_entry_time, lunch_start_time, lunch_end_time, last_exit_time, status, total_minutes_worked } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     const existingRes = await db.query('SELECT * FROM attendances WHERE id = $1', [id]);
@@ -537,16 +537,36 @@ const updateAttendanceRecord = async (req, res) => {
       return errorResponse(res, 'Registro de asistencia no encontrado.', null, 404);
     }
 
+    // Sanitizar timestamps para evitar sintaxis corrupta (ej: 2026-09-03T05:00:00.000ZT07:15:00)
+    const cleanTs = (val) => {
+      if (!val) return null;
+      const str = String(val).trim();
+      const timeMatch = str.match(/(\d{1,2}:\d{2}(?::\d{2})?)$/);
+      const dateMatch = str.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch && timeMatch) {
+        let t = timeMatch[1];
+        if (t.length === 5) t += ':00';
+        return `${dateMatch[1]}T${t}`;
+      }
+      return str;
+    };
+
+    const cleanEntry = cleanTs(first_entry_time) || existing.first_entry_time;
+    const cleanLunchStart = cleanTs(lunch_start_time) || existing.lunch_start_time;
+    const cleanLunchEnd = cleanTs(lunch_end_time) || existing.lunch_end_time;
+    const cleanExit = cleanTs(last_exit_time) || existing.last_exit_time;
+
     let calculatedWorked = total_minutes_worked;
-    if (calculatedWorked === undefined || calculatedWorked === null) {
-      if (first_entry_time && last_exit_time) {
-        calculatedWorked = calculateWorkedMinutes(first_entry_time, last_exit_time, 60);
-      } else if (first_entry_time) {
+    if (calculatedWorked === undefined || calculatedWorked === null || isNaN(calculatedWorked)) {
+      if (cleanEntry && cleanExit) {
+        calculatedWorked = calculateWorkedMinutes(cleanEntry, cleanExit, 60);
+      } else if (cleanEntry) {
         calculatedWorked = 660; // 11 horas estándar
       } else {
         calculatedWorked = 0;
       }
     }
+    calculatedWorked = Math.round(Number(calculatedWorked)) || 0;
 
     await db.query(`
       UPDATE attendances SET
@@ -559,10 +579,10 @@ const updateAttendanceRecord = async (req, res) => {
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $7
     `, [
-      first_entry_time || existing.first_entry_time,
-      lunch_start_time || existing.lunch_start_time,
-      lunch_end_time || existing.lunch_end_time,
-      last_exit_time || existing.last_exit_time,
+      cleanEntry,
+      cleanLunchStart,
+      cleanLunchEnd,
+      cleanExit,
       status || existing.status,
       calculatedWorked,
       id
@@ -635,10 +655,28 @@ const createManualAttendance = async (req, res) => {
       return errorResponse(res, 'Trabajador no encontrado.', null, 404);
     }
 
-    let calculatedWorked = 660; // 11 horas hasta las 19:00
-    if (first_entry_time && last_exit_time) {
-      calculatedWorked = calculateWorkedMinutes(first_entry_time, last_exit_time, 60);
+    // Sanitizar timestamps
+    const cleanTs = (val) => {
+      if (!val) return null;
+      const str = String(val).trim();
+      const timeMatch = str.match(/(\d{1,2}:\d{2}(?::\d{2})?)$/);
+      const dateMatch = str.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (dateMatch && timeMatch) {
+        let t = timeMatch[1];
+        if (t.length === 5) t += ':00';
+        return `${dateMatch[1]}T${t}`;
+      }
+      return str;
+    };
+
+    const cleanEntry = cleanTs(first_entry_time);
+    const cleanExit = cleanTs(last_exit_time);
+
+    let calculatedWorked = 660; // 11 horas estándar
+    if (cleanEntry && cleanExit) {
+      calculatedWorked = calculateWorkedMinutes(cleanEntry, cleanExit, 60);
     }
+    calculatedWorked = Math.round(Number(calculatedWorked)) || 0;
 
     const existingRes = await db.query(
       'SELECT id FROM attendances WHERE employee_id = $1 AND attendance_date = $2',
@@ -656,7 +694,7 @@ const createManualAttendance = async (req, res) => {
           total_minutes_worked = $4,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = $5
-      `, [first_entry_time, last_exit_time, status, calculatedWorked, existing.id]);
+      `, [cleanEntry, cleanExit, status, calculatedWorked, existing.id]);
 
       attId = existing.id;
     } else {
@@ -666,7 +704,7 @@ const createManualAttendance = async (req, res) => {
           expected_entry, expected_exit, first_entry_time, last_exit_time, total_minutes_worked, is_complete
         ) VALUES ($1, $2, $3, $4, '07:00:00', '19:00:00', $5, $6, $7, 1)
         RETURNING id;
-      `, [employee_id, attendance_date, emp.shift_id || 1, status, first_entry_time, last_exit_time, calculatedWorked]);
+      `, [employee_id, attendance_date, emp.shift_id || 1, status, cleanEntry, cleanExit, calculatedWorked]);
 
       attId = resIns.rows[0].id;
     }
