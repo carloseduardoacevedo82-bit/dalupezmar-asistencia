@@ -176,18 +176,19 @@
     <!-- TARJETA DE RESULTADO DE MARCACIÓN -->
     <div id="w-result-box" class="glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 hidden space-y-3 shadow-2xl">
       <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
-          <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+        <div id="w-res-icon-wrap" class="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0">
+          <i id="w-res-icon" data-lucide="check-circle-2" class="w-6 h-6"></i>
         </div>
         <div>
           <h4 id="w-res-title" class="text-sm font-black text-white">¡Asistencia Verificada!</h4>
-          <p id="w-res-time" class="text-xs text-emerald-300 font-bold">17/08/2026</p>
+          <p id="w-res-time" class="text-xs text-emerald-300 font-bold">--/--/----</p>
         </div>
       </div>
 
-      <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 font-mono text-xs">
+      <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5 font-mono text-xs">
         <p id="w-res-msg" class="text-slate-200 font-bold"></p>
         <p id="w-res-geo" class="text-[11px] text-slate-400"></p>
+        <p id="w-res-status-badge" class="text-[10px] pt-1"></p>
       </div>
     </div>
 
@@ -199,8 +200,8 @@
   </footer>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=5.1"></script>
-  <script src="/js/auth.js?v=5.1"></script>
+  <script src="/js/api.js?v=8.7"></script>
+  <script src="/js/auth.js?v=8.7"></script>
   <script>
     lucide.createIcons();
 
@@ -417,9 +418,27 @@
         return;
       }
 
-      // Si la cámara estaba prendida y no capturó manual, tomar captura instantánea
+      // 1. Si la cámara está activa y aún no capturó snapshot manual, tomarlo automáticamente
       if (!capturedSelfieBase64 && workerCamStream) {
         takeWorkerSnapshot();
+      }
+
+      // 2. Si no tiene foto selfie tomada ni la cámara activa, ofrecer activarla
+      if (!capturedSelfieBase64 && !workerCamStream) {
+        const takePhotoNow = confirm('📷 No has capturado tu foto selfie.\n\n¿Deseas activar la cámara ahora para tomarte la foto de asistencia?\n\n(Presiona Cancelar si tu dispositivo no tiene cámara disponible)');
+        if (takePhotoNow) {
+          await toggleWorkerCamera();
+          return;
+        }
+      }
+
+      // 3. Si no tiene coordenadas GPS, alertar al colaborador
+      if (!workerGps) {
+        const proceedNoGps = confirm('⚠️ No se ha detectado tu señal GPS satelital.\n\nPara certificar que estás en la planta, por favor asegúrate de encender la Ubicación/GPS en tu celular.\n\n¿Deseas enviar tu marcación de todas formas?');
+        if (!proceedNoGps) {
+          requestWorkerGps();
+          return;
+        }
       }
 
       const resultBox = document.getElementById('w-result-box');
@@ -441,18 +460,48 @@
 
         if (response && response.success) {
           if (resultBox) {
+            const isWithin = response.data.punch.is_within_geofence;
+            const iconWrap = document.getElementById('w-res-icon-wrap');
+            const iconEl = document.getElementById('w-res-icon');
+            const timeEl = document.getElementById('w-res-time');
+            const statusBadgeEl = document.getElementById('w-res-status-badge');
+
             document.getElementById('w-res-title').textContent = response.message;
             let timeStr = new Date(response.data.punch.time).toLocaleTimeString('es-PE');
-            document.getElementById('w-res-time').textContent = `Hora: ${timeStr} • ${currentWorker.name}`;
-            document.getElementById('w-res-msg').textContent = `🏢 Sitio Asignado: ${response.data.employee.branch_name}`;
+            if (timeEl) {
+              timeEl.textContent = `Hora: ${timeStr} • ${currentWorker.name}`;
+              timeEl.className = isWithin ? 'text-xs text-emerald-300 font-bold' : 'text-xs text-amber-300 font-bold';
+            }
 
-            let geoStr = workerGps ? `🛰️ GPS: ${workerGps.lat.toFixed(4)}, ${workerGps.lng.toFixed(4)}` : '⚠️ Sin coordenadas GPS';
+            document.getElementById('w-res-msg').textContent = `🏢 Sede Asignada: ${response.data.employee.branch_name}`;
+
+            let geoStr = workerGps ? `🛰️ GPS: ${workerGps.lat.toFixed(5)}, ${workerGps.lng.toFixed(5)}` : '⚠️ Sin señal GPS';
             if (response.data.punch.distance_meters !== null) {
               geoStr += ` • Distancia a planta: ${response.data.punch.distance_meters}m`;
             }
             document.getElementById('w-res-geo').textContent = geoStr;
 
-            resultBox.className = 'glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 space-y-3 shadow-2xl';
+            if (statusBadgeEl) {
+              if (isWithin) {
+                statusBadgeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">✅ DENTRO DE GEOCERCA AUTORIZADA</span>';
+              } else if (response.data.punch.distance_meters !== null) {
+                statusBadgeEl.innerHTML = `<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">⚠️ FUERA DE GEOCERCA (${response.data.punch.distance_meters}m de distancia)</span>`;
+              } else {
+                statusBadgeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">⚠️ MARCACIÓN SIN GPS SATELITAL</span>';
+              }
+            }
+
+            if (isWithin) {
+              resultBox.className = 'glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 space-y-3 shadow-2xl';
+              if (iconWrap) iconWrap.className = 'w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0';
+              if (iconEl) iconEl.setAttribute('data-lucide', 'check-circle-2');
+            } else {
+              resultBox.className = 'glass-panel p-4 rounded-3xl border border-amber-500/40 bg-amber-950/25 space-y-3 shadow-2xl';
+              if (iconWrap) iconWrap.className = 'w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40 shrink-0';
+              if (iconEl) iconEl.setAttribute('data-lucide', 'alert-triangle');
+            }
+
+            lucide.createIcons();
             resultBox.classList.remove('hidden');
             resultBox.scrollIntoView({ behavior: 'smooth' });
           }

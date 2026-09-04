@@ -230,16 +230,25 @@ const punch = async (req, res) => {
     let isWithinGeofence = 1;
     let distanceToBranch = null;
 
-    if (latitude && longitude && emp.branch_lat && emp.branch_lng && emp.work_mode !== 'REMOTE') {
+    const hasGpsCoordinates = latitude !== undefined && latitude !== null && String(latitude).trim() !== '' &&
+                              longitude !== undefined && longitude !== null && String(longitude).trim() !== '';
+
+    if (hasGpsCoordinates && emp.branch_lat && emp.branch_lng && emp.work_mode !== 'REMOTE') {
       distanceToBranch = calculateDistanceMeters(
         Number(latitude),
         Number(longitude),
         Number(emp.branch_lat),
         Number(emp.branch_lng)
       );
-      if (distanceToBranch > (emp.branch_radius || 500)) {
+      const allowedRadius = Number(emp.branch_radius) || 250;
+      if (distanceToBranch > allowedRadius) {
         isWithinGeofence = 0;
+      } else {
+        isWithinGeofence = 1;
       }
+    } else if (!hasGpsCoordinates && punch_source === 'REMOTE_WEB' && emp.work_mode !== 'REMOTE') {
+      // Si marca por web remota sin coordenadas GPS y no tiene modo remoto autorizado, marcar fuera de geocerca
+      isWithinGeofence = 0;
     }
 
     // 3. Obtener o inicializar la jornada consolidada con hora exacta de Perú (America/Lima)
@@ -303,7 +312,7 @@ const punch = async (req, res) => {
         }
       }
 
-      // Procesar selfie si existe
+      // Procesar selfie si existe y persistir en disco y en PostgreSQL
       let selfieUrl = null;
       if (req.body.photo_selfie && req.body.photo_selfie.startsWith('data:image')) {
         try {
@@ -311,9 +320,25 @@ const punch = async (req, res) => {
           const filename = `selfie-${Date.now()}-${emp.employee_id}.jpg`;
           const fs = require('fs');
           const path = require('path');
-          const savePath = path.join(__dirname, '../../public/uploads/photos', filename);
-          fs.writeFileSync(savePath, Buffer.from(base64Data, 'base64'));
+          const photosDir = path.join(__dirname, '../../public/uploads/photos');
+          if (!fs.existsSync(photosDir)) {
+            fs.mkdirSync(photosDir, { recursive: true });
+          }
+          const savePath = path.join(photosDir, filename);
+          const buffer = Buffer.from(base64Data, 'base64');
+          fs.writeFileSync(savePath, buffer);
           selfieUrl = `/uploads/photos/${filename}`;
+
+          // Respaldo permanente en PostgreSQL para que no se borre en reinicios de Render
+          try {
+            await client.query(`
+              INSERT INTO employee_photos (employee_id, filename, mime_type, photo_data)
+              VALUES ($1, $2, $3, $4)
+              ON CONFLICT (filename) DO UPDATE SET photo_data = EXCLUDED.photo_data;
+            `, [emp.employee_id, filename, 'image/jpeg', buffer]);
+          } catch (dbPhotoErr) {
+            console.warn('⚠️ No se pudo guardar selfie en BD:', dbPhotoErr.message);
+          }
         } catch (err) {
           console.warn('Error al guardar foto selfie:', err.message);
         }
@@ -437,8 +462,12 @@ const punch = async (req, res) => {
       msg += ' (Puntual)';
     }
 
-    if (isWithinGeofence === 0 && distanceToBranch) {
+    if (isWithinGeofence === 0 && distanceToBranch !== null) {
       msg += ` ⚠️ Fuera de sede asignada (${distanceToBranch}m de distancia).`;
+    } else if (isWithinGeofence === 0 && !hasGpsCoordinates && punch_source === 'REMOTE_WEB') {
+      msg += ' ⚠️ Marcación sin coordenadas GPS.';
+    } else if (isWithinGeofence === 1 && distanceToBranch !== null) {
+      msg += ` ✅ En sede asignada (${distanceToBranch}m).`;
     }
 
     return successResponse(res, msg, {
@@ -649,6 +678,9 @@ const getTodayLogs = async (req, res) => {
         l.punch_time,
         l.punch_source,
         l.is_within_geofence,
+        l.latitude,
+        l.longitude,
+        l.device_info,
         e.id as employee_id,
         e.employee_code,
         e.first_name,

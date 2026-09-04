@@ -64,7 +64,13 @@ const api = {
 
       if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/worker-login')) {
         this.clearSession();
-        window.location.href = '/index.html?expired=1';
+        const isWorker = window.location.pathname.includes('trabajador') || window.location.pathname.includes('portal-trabajador');
+        if (isWorker) {
+          localStorage.removeItem('dalupezmar_worker_user');
+          window.location.href = '/portal-trabajador.html?expired=1';
+        } else {
+          window.location.href = '/index.html?expired=1';
+        }
         return null;
       }
 

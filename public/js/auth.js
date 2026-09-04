@@ -122,23 +122,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Verificar si la página requiere autenticación (todas excepto login y kiosco)
+  // Verificar si la página requiere autenticación (todas excepto login, kiosco y portal del trabajador)
   const path = window.location.pathname;
   const isLoginPage = path.endsWith('index.html') || path === '/' || path.endsWith('/public/');
   const isKioskPage = path.endsWith('kiosk.html');
   const isRemotePage = path.endsWith('remote-attendance.html');
+  const isWorkerPortal = path.includes('portal-trabajador') || path.includes('trabajador');
 
   const token = api.getToken();
   const user = api.getUser();
 
-  if (!token && !isLoginPage && !isKioskPage && !isRemotePage) {
+  if (!token && !isLoginPage && !isKioskPage && !isRemotePage && !isWorkerPortal) {
     window.location.href = '/index.html';
     return;
   }
 
-  // Si está en login y ya tiene token válido, enviar al dashboard
+  // Si está en login y ya tiene token válido, enviar al dashboard o portal
   if (token && isLoginPage) {
-    window.location.href = '/dashboard.html';
+    const isWorker = localStorage.getItem('dalupezmar_worker_user') && (!user || user.role === 'WORKER');
+    if (isWorker) {
+      window.location.href = '/portal-trabajador.html';
+    } else {
+      window.location.href = '/dashboard.html';
+    }
     return;
   }
 
