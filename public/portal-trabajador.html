@@ -200,8 +200,8 @@
   </footer>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=8.7"></script>
-  <script src="/js/auth.js?v=8.7"></script>
+  <script src="/js/api.js?v=8.8"></script>
+  <script src="/js/auth.js?v=8.8"></script>
   <script>
     lucide.createIcons();
 
@@ -313,18 +313,34 @@
       }
     }
 
+    function getDistanceFromBranch(lat, lng) {
+      if (!currentWorker || !currentWorker.branch_lat || !currentWorker.branch_lng) return null;
+      const bLat = Number(currentWorker.branch_lat);
+      const bLng = Number(currentWorker.branch_lng);
+      if (bLat === 0 && bLng === 0) return null;
+
+      const R = 6371e3; // Metros
+      const φ1 = (lat * Math.PI) / 180;
+      const φ2 = (bLat * Math.PI) / 180;
+      const Δφ = ((bLat - lat) * Math.PI) / 180;
+      const Δλ = ((bLng - lng) * Math.PI) / 180;
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Math.round(R * c);
+    }
+
     function requestWorkerGps() {
       const indicator = document.getElementById('w-gps-indicator');
       const title = document.getElementById('w-gps-title');
       const coordsEl = document.getElementById('w-gps-coords');
 
       if (!navigator.geolocation) {
-        if (title) title.textContent = 'GPS no soportado';
+        if (title) title.textContent = 'GPS no soportado en este navegador';
         if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-rose-500';
         return;
       }
 
-      if (title) title.textContent = 'Obteniendo GPS Satelital...';
+      if (title) title.textContent = 'Calculando coordenadas GPS satelitales...';
       if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse';
 
       navigator.geolocation.getCurrentPosition(
@@ -335,9 +351,24 @@
             accuracy: pos.coords.accuracy
           };
 
-          if (title) title.textContent = 'GPS Satelital Activo';
-          if (coordsEl) coordsEl.textContent = `Lat: ${workerGps.lat.toFixed(5)}, Lng: ${workerGps.lng.toFixed(5)} (±${Math.round(workerGps.accuracy)}m)`;
-          if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-md shadow-emerald-500/50';
+          const dist = getDistanceFromBranch(workerGps.lat, workerGps.lng);
+          const maxRadius = Number(currentWorker?.branch_radius) || 250;
+
+          if (dist !== null) {
+            if (dist <= maxRadius) {
+              if (title) title.textContent = 'GPS Satelital: En Sede Autorizada';
+              if (coordsEl) coordsEl.textContent = `A ${dist}m de planta (Dentro del límite de ${maxRadius}m) • ±${Math.round(workerGps.accuracy)}m`;
+              if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-md shadow-emerald-500/50';
+            } else {
+              if (title) title.textContent = '⛔ FUERA DE GEOCERCA AUTORIZADA';
+              if (coordsEl) coordsEl.textContent = `Estás a ${dist}m de planta (Radio máx: ${maxRadius}m) - Marcación bloqueada`;
+              if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-rose-500 animate-pulse';
+            }
+          } else {
+            if (title) title.textContent = 'GPS Satelital Activo';
+            if (coordsEl) coordsEl.textContent = `Lat: ${workerGps.lat.toFixed(5)}, Lng: ${workerGps.lng.toFixed(5)} (±${Math.round(workerGps.accuracy)}m)`;
+            if (indicator) indicator.className = 'w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-md shadow-emerald-500/50';
+          }
         },
         (err) => {
           console.warn('GPS error:', err);
@@ -432,13 +463,19 @@
         }
       }
 
-      // 3. Si no tiene coordenadas GPS, alertar al colaborador
+      // 3. Si no tiene coordenadas GPS, BLOQUEAR la marcación
       if (!workerGps) {
-        const proceedNoGps = confirm('⚠️ No se ha detectado tu señal GPS satelital.\n\nPara certificar que estás en la planta, por favor asegúrate de encender la Ubicación/GPS en tu celular.\n\n¿Deseas enviar tu marcación de todas formas?');
-        if (!proceedNoGps) {
-          requestWorkerGps();
-          return;
-        }
+        alert('⛔ GPS SATELITAL OBLIGATORIO:\n\nNo se ha detectado tu señal GPS.\n\nPara poder registrar asistencia en la sede PECEPE S.A.C., es indispensable que actives la Ubicación/GPS en tu celular y aceptes los permisos en el navegador.');
+        requestWorkerGps();
+        return;
+      }
+
+      // 4. Validación inmediata de Geocerca: Si está fuera del radio, PROHIBIR marcar
+      const distToBranch = getDistanceFromBranch(workerGps.lat, workerGps.lng);
+      const allowedRadius = Number(currentWorker?.branch_radius) || 250;
+      if (distToBranch !== null && distToBranch > allowedRadius) {
+        alert(`⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de tu sede (${currentWorker?.branch_name || 'Planta PECEPE'}).\n\nEstás a ${distToBranch} metros de distancia (Radio permitido: ${allowedRadius} metros).\n\nDebes estar físicamente dentro de las instalaciones de la planta para poder registrar tu asistencia.`);
+        return;
       }
 
       const resultBox = document.getElementById('w-result-box');
@@ -470,7 +507,7 @@
             let timeStr = new Date(response.data.punch.time).toLocaleTimeString('es-PE');
             if (timeEl) {
               timeEl.textContent = `Hora: ${timeStr} • ${currentWorker.name}`;
-              timeEl.className = isWithin ? 'text-xs text-emerald-300 font-bold' : 'text-xs text-amber-300 font-bold';
+              timeEl.className = 'text-xs text-emerald-300 font-bold';
             }
 
             document.getElementById('w-res-msg').textContent = `🏢 Sede Asignada: ${response.data.employee.branch_name}`;
@@ -482,24 +519,12 @@
             document.getElementById('w-res-geo').textContent = geoStr;
 
             if (statusBadgeEl) {
-              if (isWithin) {
-                statusBadgeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">✅ DENTRO DE GEOCERCA AUTORIZADA</span>';
-              } else if (response.data.punch.distance_meters !== null) {
-                statusBadgeEl.innerHTML = `<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">⚠️ FUERA DE GEOCERCA (${response.data.punch.distance_meters}m de distancia)</span>`;
-              } else {
-                statusBadgeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">⚠️ MARCACIÓN SIN GPS SATELITAL</span>';
-              }
+              statusBadgeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">✅ DENTRO DE GEOCERCA AUTORIZADA</span>';
             }
 
-            if (isWithin) {
-              resultBox.className = 'glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 space-y-3 shadow-2xl';
-              if (iconWrap) iconWrap.className = 'w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0';
-              if (iconEl) iconEl.setAttribute('data-lucide', 'check-circle-2');
-            } else {
-              resultBox.className = 'glass-panel p-4 rounded-3xl border border-amber-500/40 bg-amber-950/25 space-y-3 shadow-2xl';
-              if (iconWrap) iconWrap.className = 'w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40 shrink-0';
-              if (iconEl) iconEl.setAttribute('data-lucide', 'alert-triangle');
-            }
+            resultBox.className = 'glass-panel p-4 rounded-3xl border border-emerald-500/40 bg-emerald-950/25 space-y-3 shadow-2xl';
+            if (iconWrap) iconWrap.className = 'w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40 shrink-0';
+            if (iconEl) iconEl.setAttribute('data-lucide', 'check-circle-2');
 
             lucide.createIcons();
             resultBox.classList.remove('hidden');
@@ -517,6 +542,31 @@
       } catch (error) {
         const errMsg = error.message || 'Error al registrar marcación.';
         alert(errMsg);
+
+        if (resultBox) {
+          resultBox.className = 'glass-panel p-4 rounded-3xl border border-rose-500/50 bg-rose-950/40 space-y-3 shadow-2xl';
+          const iconWrap = document.getElementById('w-res-icon-wrap');
+          const iconEl = document.getElementById('w-res-icon');
+          const timeEl = document.getElementById('w-res-time');
+          const statusBadgeEl = document.getElementById('w-res-status-badge');
+
+          if (iconWrap) iconWrap.className = 'w-11 h-11 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/40 shrink-0';
+          if (iconEl) iconEl.setAttribute('data-lucide', 'shield-alert');
+          document.getElementById('w-res-title').textContent = '⛔ MARCACIÓN DENEGADA';
+          if (timeEl) {
+            timeEl.textContent = `Intento: ${new Date().toLocaleTimeString('es-PE')} • ${currentWorker?.name || ''}`;
+            timeEl.className = 'text-xs text-rose-300 font-bold';
+          }
+          document.getElementById('w-res-msg').textContent = errMsg;
+          document.getElementById('w-res-geo').textContent = workerGps ? `GPS: ${workerGps.lat.toFixed(5)}, ${workerGps.lng.toFixed(5)}` : 'Sin GPS';
+          if (statusBadgeEl) {
+            statusBadgeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">⛔ ACCESO BLOQUEADO POR GEOCERCA</span>';
+          }
+          lucide.createIcons();
+          resultBox.classList.remove('hidden');
+          resultBox.scrollIntoView({ behavior: 'smooth' });
+        }
+
         if (errMsg.includes('INACTIVO') || errMsg.includes('BAJA')) {
           handleWorkerLogout();
         }

@@ -226,14 +226,23 @@ const punch = async (req, res) => {
       }, 403);
     }
 
-    // 2. Validación de Geocerca GPS (si aplica para marcación remota/móvil)
+    // 2. Validación Estricta de Geocerca GPS para Marcación Móvil / Web
     let isWithinGeofence = 1;
     let distanceToBranch = null;
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     const hasGpsCoordinates = latitude !== undefined && latitude !== null && String(latitude).trim() !== '' &&
                               longitude !== undefined && longitude !== null && String(longitude).trim() !== '';
 
-    if (hasGpsCoordinates && emp.branch_lat && emp.branch_lng && emp.work_mode !== 'REMOTE') {
+    // Si la marcación viene del portal web móvil y el colaborador tiene sede física con coordenadas
+    if (punch_source === 'REMOTE_WEB' && emp.branch_lat && emp.branch_lng && Number(emp.branch_lat) !== 0) {
+      if (!hasGpsCoordinates) {
+        return errorResponse(res, `⛔ MARCACIÓN BLOQUEADA: No se detectaron coordenadas GPS satelitales.\n\nEs obligatorio encender la ubicación/GPS en tu celular y aceptar los permisos en el navegador para certificar tu presencia en la sede ${emp.branch_name || 'PECEPE S.A.C.'}.`, {
+          error_code: 'NO_GPS',
+          branch_name: emp.branch_name
+        }, 400);
+      }
+
       distanceToBranch = calculateDistanceMeters(
         Number(latitude),
         Number(longitude),
@@ -241,21 +250,33 @@ const punch = async (req, res) => {
         Number(emp.branch_lng)
       );
       const allowedRadius = Number(emp.branch_radius) || 250;
+
+      // SI ESTÁ FUERA DEL RADIO PERMITIDO, SE BLOQUEA / PROHÍBE LA MARCACIÓN TOTALMENTE
       if (distanceToBranch > allowedRadius) {
-        isWithinGeofence = 0;
-      } else {
-        isWithinGeofence = 1;
+        await recordAuditLog(
+          1,
+          'PUNCH_BLOCKED_OUTSIDE_GEOFENCE',
+          'attendances',
+          emp.employee_id,
+          `Marcación bloqueada fuera de geocerca: ${emp.first_name} ${emp.last_name} (${distanceToBranch}m de ${emp.branch_name}, radio permitido: ${allowedRadius}m)`,
+          ip
+        );
+
+        return errorResponse(res, `⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de tu sede asignada (${emp.branch_name || 'Planta PECEPE'}).\n\nEstás a ${distanceToBranch} metros de distancia (Radio permitido: ${allowedRadius} metros).\n\nDebes estar físicamente dentro de la planta para poder registrar tu asistencia.`, {
+          error_code: 'OUTSIDE_GEOFENCE',
+          distance_meters: distanceToBranch,
+          allowed_radius: allowedRadius,
+          branch_name: emp.branch_name
+        }, 403);
       }
-    } else if (!hasGpsCoordinates && punch_source === 'REMOTE_WEB' && emp.work_mode !== 'REMOTE') {
-      // Si marca por web remota sin coordenadas GPS y no tiene modo remoto autorizado, marcar fuera de geocerca
-      isWithinGeofence = 0;
+
+      isWithinGeofence = 1;
     }
 
     // 3. Obtener o inicializar la jornada consolidada con hora exacta de Perú (America/Lima)
     const now = new Date();
     const todayStr = getPeruDateString(now);
     const nowIso = getPeruDateTimeString(now);
-    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
 
     const defaultShiftExit = emp.shift_exit_time || '19:00:00';
     const defaultShiftEntry = emp.shift_entry_time || '07:00:00';
