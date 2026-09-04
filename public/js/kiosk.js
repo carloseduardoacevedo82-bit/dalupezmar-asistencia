@@ -9,8 +9,12 @@ let lastScanTime = 0;
 let barcodeBuffer = '';
 let barcodeTimeout = null;
 
+let kioskGps = null;
+const PECEPE_COORDS = { lat: -12.235619, lng: -76.810871, radius: 50 };
+
 document.addEventListener('DOMContentLoaded', async () => {
   startLiveClock();
+  initKioskGps();
   initEventListeners();
   await initCameraScanner();
   await loadRecentLogs();
@@ -18,6 +22,59 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Polling automático de marcaciones cada 15 segundos
   setInterval(loadRecentLogs, 15000);
 });
+
+/**
+ * Inicializar rastreo GPS del Kiosco / Pantalla Principal
+ */
+function initKioskGps() {
+  const indicator = document.getElementById('kiosk-gps-indicator');
+  const text = document.getElementById('kiosk-gps-text');
+
+  if (!navigator.geolocation) {
+    if (text) text.textContent = 'GPS no compatible';
+    if (indicator) indicator.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+    return;
+  }
+
+  function updatePos(pos) {
+    kioskGps = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy
+    };
+
+    const dist = getKioskDistanceFromBranch(kioskGps.lat, kioskGps.lng);
+    if (dist !== null) {
+      if (dist <= PECEPE_COORDS.radius) {
+        if (text) text.textContent = `En Planta PECEPE (${dist}m) • ±${Math.round(kioskGps.accuracy)}m`;
+        if (indicator) indicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-500/50';
+      } else {
+        if (text) text.textContent = `⛔ Fuera de Planta (${dist}m) • Bloqueado`;
+        if (indicator) indicator.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse';
+      }
+    }
+  }
+
+  function onGpsError(err) {
+    console.warn('[Kiosk GPS Error]', err);
+    if (text) text.textContent = 'GPS Desactivado (Ubicación requerida)';
+    if (indicator) indicator.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+  }
+
+  navigator.geolocation.getCurrentPosition(updatePos, onGpsError, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  navigator.geolocation.watchPosition(updatePos, onGpsError, { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 });
+}
+
+function getKioskDistanceFromBranch(lat, lng) {
+  const R = 6371e3; // Metros
+  const φ1 = (lat * Math.PI) / 180;
+  const φ2 = (PECEPE_COORDS.lat * Math.PI) / 180;
+  const Δφ = ((PECEPE_COORDS.lat - lat) * Math.PI) / 180;
+  const Δλ = ((PECEPE_COORDS.lng - lng) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
 
 /**
  * Reloj y Fecha Digital en Vivo
@@ -241,11 +298,31 @@ async function processPunch(token, source = 'KIOSK_QR') {
   if (isProcessingScan) return;
   isProcessingScan = true;
 
+  // 1. Validar que el dispositivo tenga señal GPS activa
+  if (!kioskGps) {
+    playFeedbackAudio('error');
+    alert('⛔ GPS SATELITAL OBLIGATORIO:\n\nNo se ha detectado la ubicación GPS de este dispositivo.\n\nPara poder registrar asistencia en la sede PECEPE S.A.C., debes encender la Ubicación/GPS en tu equipo o celular y permitir los permisos de ubicación en el navegador.');
+    initKioskGps();
+    setTimeout(() => { isProcessingScan = false; }, 1500);
+    return;
+  }
+
+  // 2. Validar que esté físicamente dentro de los 50 metros de Planta PECEPE
+  const dist = getKioskDistanceFromBranch(kioskGps.lat, kioskGps.lng);
+  if (dist !== null && dist > PECEPE_COORDS.radius) {
+    playFeedbackAudio('error');
+    alert(`⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de la sede PECEPE S.A.C.\n\nEstás a ${dist} metros de distancia (Radio permitido: ${PECEPE_COORDS.radius} metros).\n\nDebes estar físicamente dentro de las instalaciones de la planta para poder registrar tu asistencia.`);
+    setTimeout(() => { isProcessingScan = false; }, 1500);
+    return;
+  }
+
   try {
     const response = await api.attendance.punch({
       token,
       punch_type: currentPunchMode,
       punch_source: source,
+      latitude: kioskGps.lat,
+      longitude: kioskGps.lng,
       device_info: `Kiosk Screen (${navigator.userAgent.substring(0, 50)})`
     });
 
@@ -258,6 +335,7 @@ async function processPunch(token, source = 'KIOSK_QR') {
       if (response && (response.message?.includes('INACTIVO') || response.message?.includes('BAJA') || response.data?.is_inactive)) {
         showInactiveWorkerCard(response.data || {}, response.message);
       } else {
+        alert(response.message || 'Marcación no procesada.');
         showToast(response.message || 'Marcación no procesada.', 'error');
       }
     }
@@ -266,6 +344,9 @@ async function processPunch(token, source = 'KIOSK_QR') {
     const errMsg = error.message || 'Credencial no reconocida.';
     if (errMsg.includes('INACTIVO') || errMsg.includes('BAJA')) {
       showInactiveWorkerCard(error.data || {}, errMsg);
+    } else if (error.status === 403 || errMsg.includes('GEOCERCA') || errMsg.includes('DENEGADA') || errMsg.includes('GPS')) {
+      alert(errMsg);
+      showToast(errMsg, 'error');
     } else {
       showToast(errMsg, 'error');
     }

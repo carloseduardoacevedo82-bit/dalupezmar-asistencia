@@ -68,8 +68,13 @@
       </div>
     </div>
 
-    <!-- Reloj Digital Gigante en Tiempo Real -->
-    <div class="flex items-center gap-6">
+    <!-- Reloj Digital Gigante en Tiempo Real e Indicador GPS -->
+    <div class="flex items-center gap-4 lg:gap-6">
+      <div id="kiosk-gps-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
+        <span id="kiosk-gps-indicator" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="kiosk-gps-text" class="text-[11px] text-slate-300 font-semibold font-mono">GPS: Iniciando...</span>
+      </div>
+
       <div class="text-right">
         <div id="live-clock" class="text-3xl lg:text-4xl font-black font-mono tracking-wider text-cyan-300 drop-shadow-md">
           --:--:--
@@ -265,9 +270,9 @@
   </footer>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=5.1"></script>
-  <script src="/js/auth.js?v=5.1"></script>
-  <script src="/js/kiosk.js?v=5.1"></script>
+  <script src="/js/api.js?v=8.9"></script>
+  <script src="/js/auth.js?v=8.9"></script>
+  <script src="/js/kiosk.js?v=8.9"></script>
   <script>
     lucide.createIcons();
   </script>

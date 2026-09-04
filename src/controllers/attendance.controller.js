@@ -234,10 +234,11 @@ const punch = async (req, res) => {
     const hasGpsCoordinates = latitude !== undefined && latitude !== null && String(latitude).trim() !== '' &&
                               longitude !== undefined && longitude !== null && String(longitude).trim() !== '';
 
-    // Si la marcación viene del portal web móvil y el colaborador tiene sede física con coordenadas
-    if (punch_source === 'REMOTE_WEB' && emp.branch_lat && emp.branch_lng && Number(emp.branch_lat) !== 0) {
+    // BLOQUEO ESTRICTO UNIVERSAL DE GEOCERCA (50M) PARA TODOS LOS COLABORADORES
+    // Aplica a TODOS los canales: Portal del Trabajador, Kiosco Escáner, Marcación Manual DNI, etc.
+    if (emp.branch_lat && emp.branch_lng && Number(emp.branch_lat) !== 0) {
       if (!hasGpsCoordinates) {
-        return errorResponse(res, `⛔ MARCACIÓN BLOQUEADA: No se detectaron coordenadas GPS satelitales.\n\nEs obligatorio encender la ubicación/GPS en tu celular y aceptar los permisos en el navegador para certificar tu presencia en la sede ${emp.branch_name || 'PECEPE S.A.C.'}.`, {
+        return errorResponse(res, `⛔ GPS SATELITAL OBLIGATORIO:\n\nNo se detectaron coordenadas GPS satelitales en este dispositivo.\n\nEs indispensable encender la ubicación/GPS y autorizar los permisos en el navegador para certificar tu presencia en la sede ${emp.branch_name || 'PECEPE S.A.C.'} (Aplica tanto para el Kiosco como para el Portal del Trabajador).`, {
           error_code: 'NO_GPS',
           branch_name: emp.branch_name
         }, 400);
@@ -258,7 +259,7 @@ const punch = async (req, res) => {
           'PUNCH_BLOCKED_OUTSIDE_GEOFENCE',
           'attendances',
           emp.employee_id,
-          `Marcación bloqueada fuera de geocerca: ${emp.first_name} ${emp.last_name} (${distanceToBranch}m de ${emp.branch_name}, radio permitido: ${allowedRadius}m)`,
+          `Marcación bloqueada fuera de geocerca: ${emp.first_name} ${emp.last_name} (${distanceToBranch}m de ${emp.branch_name}, radio permitido: ${allowedRadius}m, origen: ${punch_source})`,
           ip
         );
 
