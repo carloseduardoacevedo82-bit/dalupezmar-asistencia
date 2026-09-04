@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../../database/database');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { generateSecureQrToken, generateBarcodeValue } = require('../utils/badgeGenerator');
@@ -229,6 +231,23 @@ const createEmployee = async (req, res) => {
       const newEmp = insertEmpRes.rows[0];
       const newEmpId = newEmp.id;
 
+      // Respaldo permanente de foto en PostgreSQL (Previene pérdida en reinicios de Render)
+      if (req.file) {
+        try {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          await client.query(`
+            INSERT INTO employee_photos (employee_id, filename, mime_type, photo_data)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (filename) DO UPDATE SET
+              photo_data = EXCLUDED.photo_data,
+              mime_type = EXCLUDED.mime_type,
+              employee_id = EXCLUDED.employee_id;
+          `, [newEmpId, req.file.filename, req.file.mimetype, fileBuffer]);
+        } catch (photoErr) {
+          console.error('Error al persistir foto en PostgreSQL:', photoErr.message);
+        }
+      }
+
       // Emisión automática de fotocheck/credencial activa
       const qrHash = generateSecureQrToken(newEmpId, finalEmpCode);
       const barcodeVal = generateBarcodeValue(document_number);
@@ -361,6 +380,23 @@ const updateEmployee = async (req, res) => {
       if (status) {
         const badgeStatus = (status === 'INACTIVE' || status === 'SUSPENDED' || status === 'BAJA') ? 'REVOKED' : 'ACTIVE';
         await client.query("UPDATE badges SET status = $1 WHERE employee_id = $2", [badgeStatus, id]);
+      }
+
+      // Respaldo permanente de foto en PostgreSQL (Previene pérdida en reinicios de Render)
+      if (req.file) {
+        try {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          await client.query(`
+            INSERT INTO employee_photos (employee_id, filename, mime_type, photo_data)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (filename) DO UPDATE SET
+              photo_data = EXCLUDED.photo_data,
+              mime_type = EXCLUDED.mime_type,
+              employee_id = EXCLUDED.employee_id;
+          `, [id, req.file.filename, req.file.mimetype, fileBuffer]);
+        } catch (photoErr) {
+          console.error('Error al persistir foto en PostgreSQL:', photoErr.message);
+        }
       }
     });
 

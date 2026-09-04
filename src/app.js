@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config/config');
 const db = require('../database/database');
 
@@ -35,6 +36,54 @@ app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  next();
+});
+
+// Servidor dinámico resiliente de fotos de colaboradores (Respaldo permanente en PostgreSQL)
+app.get('/uploads/photos/:filename', async (req, res, next) => {
+  const filename = req.params.filename;
+  const photosDir = path.join(__dirname, '../public/uploads/photos');
+  const filePath = path.join(photosDir, filename);
+
+  // 1. Si existe físicamente en el disco del contenedor, servirlo de inmediato
+  if (fs.existsSync(filePath)) {
+    return res.sendFile(filePath);
+  }
+
+  // 2. Si no existe en disco (debido a reinicio o redeploy en Render), rescatarlo de PostgreSQL
+  try {
+    const photoRes = await db.query(
+      'SELECT mime_type, photo_data FROM employee_photos WHERE filename = $1 LIMIT 1',
+      [filename]
+    );
+
+    if (photoRes.rows.length > 0) {
+      const { mime_type, photo_data } = photoRes.rows[0];
+
+      // Recrear el archivo en disco como caché para futuras peticiones ultra-rápidas
+      try {
+        if (!fs.existsSync(photosDir)) {
+          fs.mkdirSync(photosDir, { recursive: true });
+        }
+        fs.writeFileSync(filePath, photo_data);
+      } catch (writeErr) {
+        console.warn('⚠️ No se pudo cachear foto en disco:', writeErr.message);
+      }
+
+      res.setHeader('Content-Type', mime_type || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.end(photo_data);
+    }
+  } catch (dbErr) {
+    console.error('❌ Error recuperando foto de PostgreSQL:', dbErr.message);
+  }
+
+  // 3. Fallback a avatar por defecto si no existe ni en disco ni en base de datos
+  const defaultAvatar = path.join(photosDir, 'default-avatar.png');
+  if (fs.existsSync(defaultAvatar)) {
+    return res.sendFile(defaultAvatar);
+  }
+
   next();
 });
 

@@ -109,6 +109,46 @@ async function init() {
   await db.query(schemaSql);
   console.log('✅ [PostgreSQL] Esquema y tablas verificadas con éxito.');
 
+  // 1.1 Asegurar tabla persistente de fotos de colaboradores (Anti-pérdida en Render)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS employee_photos (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER,
+      filename VARCHAR(255) UNIQUE NOT NULL,
+      mime_type VARCHAR(100) NOT NULL,
+      photo_data BYTEA NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_employee_photos_filename ON employee_photos(filename);
+    CREATE INDEX IF NOT EXISTS idx_employee_photos_emp_id ON employee_photos(employee_id);
+  `);
+
+  // Sincronizar fotos físicas hacia PostgreSQL si no estuvieran ya persistidas
+  try {
+    const photosDir = path.join(__dirname, '../public/uploads/photos');
+    if (fs.existsSync(photosDir)) {
+      const photoFiles = fs.readdirSync(photosDir);
+      for (const fn of photoFiles) {
+        if (fn.startsWith('.')) continue;
+        const fullP = path.join(photosDir, fn);
+        const ext = path.extname(fn).toLowerCase();
+        let mime = 'image/jpeg';
+        if (ext === '.png') mime = 'image/png';
+        else if (ext === '.webp') mime = 'image/webp';
+        else if (ext === '.svg') mime = 'image/svg+xml';
+
+        const buf = fs.readFileSync(fullP);
+        await db.query(`
+          INSERT INTO employee_photos (filename, mime_type, photo_data)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (filename) DO NOTHING;
+        `, [fn, mime, buf]);
+      }
+    }
+  } catch (syncPhotoErr) {
+    console.warn('⚠️ Nota al sincronizar fotos locales:', syncPhotoErr.message);
+  }
+
   // 2. Asegurar Usuarios Administrativos
   const adminPasswordHash = bcrypt.hashSync('admin123', 10);
   const users = [
