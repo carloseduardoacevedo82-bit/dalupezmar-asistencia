@@ -194,7 +194,7 @@ function renderEmployeesTable(list) {
             <img src="${emp.photo_url || DEFAULT_AVATAR}" width="56" height="56" loading="lazy" class="w-14 h-14 min-w-[56px] min-h-[56px] rounded-2xl object-cover border-2 border-slate-700/80 shadow-md transition transform group-hover:scale-105" onerror="this.onerror=null; this.src=DEFAULT_AVATAR;">
           </div>
           <div>
-            <p class="font-extrabold text-white text-sm uppercase tracking-tight leading-snug">${emp.first_name} ${emp.last_name}</p>
+            <p class="font-extrabold text-white text-sm uppercase tracking-tight leading-snug">${(emp.last_name && emp.first_name) ? `${emp.last_name}, ${emp.first_name}`.toUpperCase() : `${emp.first_name || ''} ${emp.last_name || ''}`.trim().toUpperCase()}</p>
             <p class="text-xs text-slate-400 font-mono mt-0.5">${emp.employee_code} <span class="text-slate-600">•</span> ${emp.email || 'DALUPEZMAR'}</p>
           </div>
         </td>
@@ -303,10 +303,10 @@ function applyFilters() {
     return matchSearch && matchDept && matchMode;
   });
 
-  // Ordenar en orden alfabético A-Z por Nombres y Apellidos
+  // Ordenar en orden alfabético A-Z estrictamente por Apellidos y Nombres
   filtered.sort((a, b) => {
-    const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
-    const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
     return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
   });
 
@@ -321,7 +321,10 @@ window.openTerminateModal = function(empId) {
   if (!emp) return;
 
   targetTerminateEmpId = empId;
-  document.getElementById('terminate-emp-name').textContent = `${emp.first_name} ${emp.last_name} (${emp.document_type || 'DNI'}: ${emp.document_number})`;
+  const displayName = (emp.last_name && emp.first_name)
+    ? `${emp.last_name}, ${emp.first_name}`.toUpperCase()
+    : `${emp.first_name || ''} ${emp.last_name || ''}`.trim().toUpperCase();
+  document.getElementById('terminate-emp-name').textContent = `${displayName} (${emp.document_type || 'DNI'}: ${emp.document_number})`;
   document.getElementById('terminate-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('modal-terminate-emp')?.classList.remove('hidden');
 };

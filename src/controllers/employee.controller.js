@@ -73,7 +73,7 @@ const getEmployees = async (req, res) => {
       pIdx++;
     }
 
-    query += ` ORDER BY e.first_name ASC, e.last_name ASC`;
+    query += ` ORDER BY e.last_name ASC, e.first_name ASC`;
 
     const result = await db.query(query, params);
 

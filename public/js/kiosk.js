@@ -491,12 +491,15 @@ async function loadRecentLogs() {
 
       container.innerHTML = logs.slice(0, 10).map(log => {
         const time = new Date(log.punch_time).toLocaleTimeString('es-PE', { hour12: true });
+        const empName = (log.last_name && log.first_name)
+          ? `${log.last_name}, ${log.first_name}`.toUpperCase()
+          : `${log.first_name || ''} ${log.last_name || ''}`.trim().toUpperCase();
         return `
           <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition">
             <div class="flex items-center gap-3">
               <img src="${log.photo_url || '/uploads/photos/default-avatar.png'}" class="w-8 h-8 rounded-xl object-cover border border-slate-700">
               <div>
-                <p class="text-xs font-bold text-white leading-tight">${log.first_name} ${log.last_name}</p>
+                <p class="text-xs font-bold text-white leading-tight">${empName}</p>
                 <p class="text-[10px] text-slate-400">${log.position_name || 'Personal'}</p>
               </div>
             </div>

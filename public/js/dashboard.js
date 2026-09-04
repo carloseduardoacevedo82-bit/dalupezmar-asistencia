@@ -188,12 +188,15 @@ function renderRecentLogs(logs) {
 
   container.innerHTML = logs.map(log => {
     const time = new Date(log.punch_time).toLocaleTimeString('es-PE', { hour12: true });
+    const empName = (log.last_name && log.first_name)
+      ? `${log.last_name}, ${log.first_name}`.toUpperCase()
+      : `${log.first_name || ''} ${log.last_name || ''}`.trim().toUpperCase();
     return `
       <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
         <div class="flex items-center gap-3">
           <img src="${log.photo_url || '/uploads/photos/default-avatar.png'}" class="w-8 h-8 rounded-xl object-cover border border-slate-700">
           <div>
-            <p class="text-xs font-bold text-white leading-tight">${log.first_name} ${log.last_name}</p>
+            <p class="text-xs font-bold text-white leading-tight">${empName}</p>
             <p class="text-[10px] text-slate-400 font-mono">${log.employee_code} • ${log.department_name || 'General'}</p>
           </div>
         </div>
@@ -221,18 +224,23 @@ async function loadJustifications() {
     }
 
     const list = response.data;
-    container.innerHTML = list.map(j => `
+    container.innerHTML = list.map(j => {
+      const jName = (j.last_name && j.first_name)
+        ? `${j.last_name}, ${j.first_name}`.toUpperCase()
+        : `${j.first_name || ''} ${j.last_name || ''}`.trim().toUpperCase();
+      return `
       <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-3">
         <div>
-          <p class="text-xs font-bold text-white">${j.first_name} ${j.last_name} <span class="text-[10px] text-purple-400 font-mono font-semibold">(${j.reason_type})</span></p>
+          <p class="text-xs font-bold text-white">${jName} <span class="text-[10px] text-purple-400 font-mono font-semibold">(${j.reason_type})</span></p>
           <p class="text-[10px] text-slate-400">Periodo: ${j.start_date} al ${j.end_date}</p>
           <p class="text-[11px] text-slate-300 italic mt-0.5 line-clamp-1">"${j.description}"</p>
         </div>
-        <button onclick="openReviewModal(${j.id}, '${j.first_name} ${j.last_name}', '${j.reason_type}', '${j.start_date} al ${j.end_date}', '${encodeURIComponent(j.description)}')" class="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-bold transition">
+        <button onclick="openReviewModal(${j.id}, '${jName}', '${j.reason_type}', '${j.start_date} al ${j.end_date}', '${encodeURIComponent(j.description)}')" class="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-bold transition">
           Revisar
         </button>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch (error) {
     console.error('Error al cargar justificaciones:', error);
   }

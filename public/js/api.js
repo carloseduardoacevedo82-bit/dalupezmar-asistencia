@@ -298,7 +298,7 @@ const api = {
           data: {
             employee: {
               id: matchedEmp.id,
-              name: `${matchedEmp.first_name} ${matchedEmp.last_name}`.trim(),
+              name: (matchedEmp.last_name && matchedEmp.first_name) ? `${matchedEmp.last_name}, ${matchedEmp.first_name}`.trim().toUpperCase() : `${matchedEmp.first_name || ''} ${matchedEmp.last_name || ''}`.trim().toUpperCase(),
               document_number: matchedEmp.document_number,
               position: matchedEmp.position_name || 'Operario',
               photo_url: matchedEmp.photo_url || '/uploads/photos/default-avatar.png',

@@ -237,7 +237,7 @@ const getEmployeesRoster = async (req, res) => {
       LEFT JOIN positions p ON e.position_id = p.id
       LEFT JOIN branches b ON e.branch_id = b.id
       LEFT JOIN badges bg ON e.id = bg.employee_id AND bg.status = 'ACTIVE'
-      ORDER BY e.last_name ASC
+      ORDER BY e.last_name ASC, e.first_name ASC
     `);
 
     return successResponse(res, 'Padrón oficial de colaboradores obtenido con éxito.', employeesRes.rows);

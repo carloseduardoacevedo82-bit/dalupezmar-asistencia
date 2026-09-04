@@ -204,8 +204,8 @@ function switchBadgeFolder(folder) {
 function renderCurrentFolderEmployees() {
   const filtered = allEmployees.filter(e => (e.status || 'ACTIVE') === currentBadgeFolder);
   filtered.sort((a, b) => {
-    const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
-    const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
     return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
   });
   renderEmployeeList(filtered);
@@ -226,12 +226,15 @@ function renderEmployeeList(employees) {
   container.innerHTML = employees.map(emp => {
     const isInactive = emp.status === 'INACTIVE';
     const isSelected = selectedEmployee && selectedEmployee.id === emp.id;
+    const displayName = (emp.last_name && emp.first_name)
+      ? `${emp.last_name}, ${emp.first_name}`
+      : `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
     return `
       <div onclick="selectEmployee(${emp.id})" class="employee-item p-3 rounded-xl border ${isInactive ? 'border-rose-900/40 bg-rose-950/20 hover:border-rose-700/50' : 'border-slate-800 bg-slate-900/50 hover:bg-cyan-950/30 hover:border-cyan-700/50'} transition cursor-pointer flex items-center justify-between ${isSelected ? (isInactive ? 'border-rose-500 bg-rose-950/50 ring-1 ring-rose-500' : 'border-cyan-500 bg-cyan-950/40 ring-1 ring-cyan-500') : ''}" data-id="${emp.id}">
         <div class="flex items-center gap-3">
           <img src="${emp.photo_url || defaultAvatarSvg}" width="36" height="36" loading="lazy" class="w-9 h-9 min-w-[36px] rounded-xl object-cover border ${isInactive ? 'border-rose-800 opacity-60' : 'border-slate-700'}" alt="avatar" onerror="this.onerror=null; this.src='${defaultAvatarSvg}';">
           <div>
-            <p class="text-xs font-bold ${isInactive ? 'text-rose-300 line-through' : 'text-slate-100'}">${emp.first_name} ${emp.last_name}</p>
+            <p class="text-xs font-bold ${isInactive ? 'text-rose-300 line-through' : 'text-slate-100'}">${displayName}</p>
             <p class="text-[10px] text-slate-400 font-mono"><span class="text-amber-400 font-bold">${emp.document_type || 'DNI'}:</span> ${emp.document_number} • <span class="${isInactive ? 'text-rose-400' : 'text-cyan-400'} font-semibold">${emp.position_name || 'Operario'}</span></p>
           </div>
         </div>
@@ -260,8 +263,8 @@ function filterEmployees(query) {
     (emp.employee_code && emp.employee_code.toLowerCase().includes(q))
   );
   filtered.sort((a, b) => {
-    const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLowerCase();
-    const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLowerCase();
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
     return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
   });
   renderEmployeeList(filtered);
@@ -356,15 +359,15 @@ async function selectEmployee(empId) {
 function renderBadge(emp) {
   if (!emp) return;
 
-  // Anverso: Nombres ARRIBA y Apellidos DEBAJO
+  // Anverso: Apellidos ARRIBA y Nombres DEBAJO (apellidos primero)
   const nombres = (emp.first_name || '').trim().toUpperCase();
   const apellidos = (emp.last_name || '').trim().toUpperCase();
 
   const nameContainer = document.getElementById('badge-fullname');
   if (nameContainer) {
     nameContainer.innerHTML = `
-      <span class="block text-xs font-black tracking-wide text-[#002855] leading-tight">${nombres}</span>
-      <span class="block text-sm font-black tracking-tight text-[#002855] leading-tight mt-0.5">${apellidos}</span>
+      <span class="block text-sm font-black tracking-tight text-[#002855] leading-tight">${apellidos}</span>
+      <span class="block text-xs font-bold tracking-wide text-[#002855] leading-tight mt-0.5">${nombres}</span>
     `;
   }
 
@@ -681,7 +684,11 @@ function setCardTheme(themeClass) {
 async function handleRegenerateToken() {
   if (!selectedEmployee) return;
 
-  if (!confirm(`¿Deseas regenerar el código QR para ${selectedEmployee.first_name} ${selectedEmployee.last_name}?`)) {
+  const selName = (selectedEmployee.last_name && selectedEmployee.first_name)
+    ? `${selectedEmployee.last_name}, ${selectedEmployee.first_name}`
+    : `${selectedEmployee.first_name || ''} ${selectedEmployee.last_name || ''}`.trim();
+
+  if (!confirm(`¿Deseas regenerar el código QR para ${selName}?`)) {
     return;
   }
 
@@ -707,7 +714,10 @@ async function handlePrintSingle() {
     showToast('Selecciona un colaborador primero.', 'warning');
     return;
   }
-  await printEmployeesBadges([selectedEmployee], `Fotocheck Oficial - ${selectedEmployee.first_name} ${selectedEmployee.last_name}`);
+  const selName = (selectedEmployee.last_name && selectedEmployee.first_name)
+    ? `${selectedEmployee.last_name}, ${selectedEmployee.first_name}`
+    : `${selectedEmployee.first_name || ''} ${selectedEmployee.last_name || ''}`.trim();
+  await printEmployeesBadges([selectedEmployee], `Fotocheck Oficial - ${selName}`);
 }
 
 async function handleDownloadPdf() {
@@ -750,21 +760,31 @@ function renderBatchList() {
   if (!container) return;
 
   const activeEmployees = allEmployees.filter(emp => (emp.status || 'ACTIVE') === 'ACTIVE');
+  activeEmployees.sort((a, b) => {
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
+    return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+  });
 
   if (totalCountEl) totalCountEl.textContent = activeEmployees.length;
 
-  container.innerHTML = activeEmployees.map(emp => `
-    <label class="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition cursor-pointer">
-      <div class="flex items-center gap-3">
-        <input type="checkbox" value="${emp.id}" checked class="batch-emp-checkbox w-4 h-4 text-cyan-600 rounded bg-slate-950 border-slate-700" onchange="updateBatchCount()">
-        <div>
-          <p class="text-xs font-bold text-white">${emp.first_name} ${emp.last_name}</p>
-          <p class="text-[10px] text-slate-400 font-mono"><span class="text-amber-400 font-bold">${emp.document_type || 'DNI'}:</span> ${emp.document_number} • <b class="text-cyan-400">${emp.position_name || 'Operario'}</b></p>
+  container.innerHTML = activeEmployees.map(emp => {
+    const displayName = (emp.last_name && emp.first_name)
+      ? `${emp.last_name}, ${emp.first_name}`
+      : `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+    return `
+      <label class="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 transition cursor-pointer">
+        <div class="flex items-center gap-3">
+          <input type="checkbox" value="${emp.id}" checked class="batch-emp-checkbox w-4 h-4 text-cyan-600 rounded bg-slate-950 border-slate-700" onchange="updateBatchCount()">
+          <div>
+            <p class="text-xs font-bold text-white">${displayName}</p>
+            <p class="text-[10px] text-slate-400 font-mono"><span class="text-amber-400 font-bold">${emp.document_type || 'DNI'}:</span> ${emp.document_number} • <b class="text-cyan-400">${emp.position_name || 'Operario'}</b></p>
+          </div>
         </div>
-      </div>
-      <span class="text-[10px] font-semibold text-slate-400 font-mono">${emp.employee_code}</span>
-    </label>
-  `).join('');
+        <span class="text-[10px] font-semibold text-slate-400 font-mono">${emp.employee_code}</span>
+      </label>
+    `;
+  }).join('');
 
   updateBatchCount();
 }
@@ -958,10 +978,10 @@ async function printEmployeesBadges(employeesList, subtitleText) {
           <img src="${item.photoSrc}" onerror="this.onerror=null;this.src='${defaultAvatarSvg}'" alt="Foto">
         </div>
 
-        <!-- Nombres y Apellidos Grandes y Legibles -->
+        <!-- Nombres y Apellidos Grandes y Legibles: Apellidos Primero -->
         <div class="name-block">
-          <div class="worker-names">${item.nombres}</div>
           <div class="worker-surnames">${item.apellidos}</div>
+          <div class="worker-names">${item.nombres}</div>
           <div class="worker-dni">${item.docType}: ${item.emp.document_number}</div>
         </div>
 

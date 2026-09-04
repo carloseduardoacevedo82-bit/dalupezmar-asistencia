@@ -852,7 +852,7 @@ const getAttendanceReport = async (req, res) => {
       pIdx++;
     }
 
-    query += ` ORDER BY a.attendance_date DESC, e.last_name ASC`;
+    query += ` ORDER BY a.attendance_date DESC, e.last_name ASC, e.first_name ASC`;
 
     const recordsRes = await db.query(query, params);
 

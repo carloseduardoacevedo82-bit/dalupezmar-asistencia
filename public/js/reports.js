@@ -357,7 +357,18 @@ function renderReportTable(data) {
     ABSENT: '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20 print:bg-rose-50 print:text-rose-900 print:border-rose-700">FALTA</span>'
   };
 
-  tbody.innerHTML = data.map(row => {
+  const sortedRows = [...data].sort((a, b) => {
+    const dateA = String(a.attendance_date || '').split('T')[0];
+    const dateB = String(b.attendance_date || '').split('T')[0];
+    if (dateA !== dateB) {
+      return dateB.localeCompare(dateA);
+    }
+    const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+    const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
+    return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+  });
+
+  tbody.innerHTML = sortedRows.map(row => {
     const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     
     let totalHoras = 0;
@@ -387,7 +398,9 @@ function renderReportTable(data) {
       : '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/10 text-sky-400 border border-sky-500/20 print:bg-sky-50 print:text-sky-900 print:border-sky-600">☀️ Diurno</span>';
 
     const tardanzaHoras = Number(((row.total_minutes_late || 0) / 60).toFixed(2));
-    const fullName = [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || 'COLABORADOR';
+    const fullName = (row.last_name && row.first_name)
+      ? `${row.last_name}, ${row.first_name}`.toUpperCase()
+      : ([row.last_name, row.first_name].filter(Boolean).join(' ').trim() || 'COLABORADOR').toUpperCase();
 
     return `
       <tr class="hover:bg-slate-900/40 transition text-xs">
@@ -1544,6 +1557,11 @@ async function loadManualEmployeesDropdown() {
     const res = await api.employees.getAll();
     if (res && res.data) {
       const activeOnly = res.data.filter(e => e.status === 'ACTIVE');
+      activeOnly.sort((a, b) => {
+        const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+        const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      });
       select.innerHTML = '<option value="">-- Seleccionar Colaborador --</option>' +
         activeOnly.map(e => `<option value="${e.id}">${e.last_name}, ${e.first_name} (DNI: ${e.document_number}) - ${e.position_name || 'Operario'}</option>`).join('');
     }
@@ -1561,7 +1579,10 @@ window.openEditAttendanceModal = function(id) {
 
   const modal = document.getElementById('modal-edit-attendance');
   document.getElementById('edit-att-id').value = row.id;
-  document.getElementById('edit-att-emp-name').textContent = `${row.first_name} ${row.last_name} (${row.employee_code} • DNI ${row.document_number})`;
+  const empDisplayName = (row.last_name && row.first_name)
+    ? `${row.last_name}, ${row.first_name}`.toUpperCase()
+    : ([row.last_name, row.first_name].filter(Boolean).join(' ').trim() || 'COLABORADOR').toUpperCase();
+  document.getElementById('edit-att-emp-name').textContent = `${empDisplayName} (${row.employee_code || ''} • DNI ${row.document_number || ''})`;
 
   const getTime = (iso) => {
     if (!iso) return '';
@@ -1584,7 +1605,11 @@ window.openEditAttendanceModal = function(id) {
  */
 window.handleDeleteAttendance = async function(id) {
   const row = reportData.find(r => r.id == id);
-  const name = row ? `${row.first_name} ${row.last_name}` : 'este colaborador';
+  const name = row
+    ? ((row.last_name && row.first_name)
+      ? `${row.last_name}, ${row.first_name}`.toUpperCase()
+      : ([row.last_name, row.first_name].filter(Boolean).join(' ').trim() || 'este colaborador').toUpperCase())
+    : 'este colaborador';
 
   if (!confirm(`¿Estás seguro de que deseas eliminar la marcación de ${name} del día ${row ? row.attendance_date : ''}? Esta acción no se puede deshacer.`)) {
     return;

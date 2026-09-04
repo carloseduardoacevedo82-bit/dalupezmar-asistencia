@@ -134,6 +134,11 @@ async function loadSupervisorEmployees() {
     const res = await api.employees.getAll();
     if (res && res.data) {
       allActiveEmployees = res.data.filter(e => e.status === 'ACTIVE');
+      allActiveEmployees.sort((a, b) => {
+        const nameA = `${a.last_name || ''}, ${a.first_name || ''}`.trim().toLowerCase();
+        const nameB = `${b.last_name || ''}, ${b.first_name || ''}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      });
       select.innerHTML = '<option value="">-- Seleccionar Colaborador --</option>' +
         allActiveEmployees.map(e => `<option value="${e.document_number}">${e.last_name}, ${e.first_name} (DNI: ${e.document_number}) - ${e.position_name || 'Operario'}</option>`).join('');
     }
@@ -158,12 +163,16 @@ window.loadMobileTodayLogs = async function() {
           ? '<span class="px-2 py-0.5 rounded text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">ENTRADA</span>'
           : '<span class="px-2 py-0.5 rounded text-[9px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/20">SALIDA</span>';
 
+        const empName = (log.last_name && log.first_name)
+          ? `${log.last_name}, ${log.first_name}`.toUpperCase()
+          : `${log.first_name || ''} ${log.last_name || ''}`.trim().toUpperCase();
+
         return `
           <div class="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-2">
             <div class="flex items-center gap-2.5">
               <img src="${log.photo_url || '/uploads/photos/default-avatar.png'}" class="w-9 h-9 rounded-xl object-cover border border-slate-700">
               <div>
-                <p class="font-extrabold text-xs text-white">${log.first_name} ${log.last_name}</p>
+                <p class="font-extrabold text-xs text-white">${empName}</p>
                 <p class="text-[10px] text-slate-400">${log.position_name || 'Operario'} • <span class="font-mono text-cyan-300 font-bold">${timeStr}</span></p>
               </div>
             </div>
