@@ -161,10 +161,7 @@ async function init() {
     await db.query(`
       INSERT INTO users (username, password_hash, full_name, email, role, is_active)
       VALUES ($1, $2, $3, $4, $5, 1)
-      ON CONFLICT (username) DO UPDATE SET
-        password_hash = EXCLUDED.password_hash,
-        role = EXCLUDED.role,
-        is_active = 1;
+      ON CONFLICT (username) DO NOTHING;
     `, [u.username, adminPasswordHash, u.full_name, u.email, u.role]);
   }
 
