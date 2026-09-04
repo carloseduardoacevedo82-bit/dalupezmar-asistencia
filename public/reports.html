@@ -19,7 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="/js/exceljs.min.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/css/styles.css?v=5.0">
+  <link rel="stylesheet" href="/css/styles.css?v=9.2">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
@@ -89,10 +89,10 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-          <button id="btn-daily-export-excel" onclick="handleDailyExportExcel()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
+          <button id="btn-daily-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Excel Diario (.xlsx)
           </button>
-          <button id="btn-daily-export-pdf" onclick="handleDailyExportPdf()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
+          <button id="btn-daily-export-pdf" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
             <i data-lucide="file-text" class="w-4 h-4"></i> Descargar / Imprimir PDF Diario
           </button>
         </div>
@@ -185,7 +185,7 @@
     </div>
 
     <!-- RESUMEN DE TOTALES DEL PERÍODO -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
       <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
         <div>
           <p class="text-[11px] text-slate-400 font-bold uppercase">Registros Encontrados</p>
@@ -199,7 +199,7 @@
       <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
         <div>
           <p class="text-[11px] text-slate-400 font-bold uppercase">Total Tardanzas</p>
-          <p id="tot-late-mins" class="text-2xl font-black text-amber-400 font-mono mt-0.5">0 min</p>
+          <p id="tot-late-mins" class="text-2xl font-black text-amber-400 font-mono mt-0.5">0.00 h</p>
         </div>
         <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
           <i data-lucide="clock-alert" class="w-5 h-5"></i>
@@ -209,7 +209,7 @@
       <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
         <div>
           <p class="text-[11px] text-slate-400 font-bold uppercase">Horas Extras Acumuladas</p>
-          <p id="tot-overtime-hrs" class="text-2xl font-black text-cyan-400 font-mono mt-0.5">0.0 h</p>
+          <p id="tot-overtime-hrs" class="text-2xl font-black text-cyan-400 font-mono mt-0.5">0.00 h</p>
         </div>
         <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
           <i data-lucide="clock" class="w-5 h-5"></i>
@@ -229,20 +229,34 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button id="btn-export-excel" onclick="exportToExcel()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
+        <button id="btn-export-excel" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer active:scale-95">
           <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar a Excel (.xlsx)
         </button>
-        <button id="btn-export-csv" onclick="exportToCsv()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer active:scale-95">
+        <button id="btn-export-csv" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer active:scale-95">
           <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i> Exportar CSV
         </button>
-        <button id="btn-print-report" onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer active:scale-95">
+        <button id="btn-print-report" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer active:scale-95">
           <i data-lucide="printer" class="w-4 h-4 text-purple-400"></i> Imprimir Reporte
         </button>
       </div>
     </div>
 
     <!-- TABLA DE TAREO -->
-    <div class="glass-panel rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+    <div id="tareo-table-container" class="glass-panel rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+      <!-- Cabecera exclusiva para impresión de Tareo -->
+      <div id="tareo-print-header" class="hidden p-4 border-b-2 border-slate-900 bg-white">
+        <div class="flex justify-between items-end">
+          <div>
+            <h1 class="text-base font-black text-slate-900 leading-tight">DALUPEZMAR SERVICIOS INDUSTRIALES S.A.C.</h1>
+            <p class="text-[10px] text-slate-600 font-bold">RUC: 20615714128 • PLANTA PRINCIPAL PECEPE S.A.C.</p>
+          </div>
+          <div class="text-right">
+            <h2 class="text-xs font-black text-blue-950 uppercase tracking-wide">REPORTE CONSOLIDADO DE TAREO Y PLANILLAS</h2>
+            <p class="text-[10px] text-slate-500 font-medium">Impreso: <span id="tareo-print-date"></span></p>
+          </div>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-300">
           <thead class="bg-slate-900/80 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-800">
@@ -257,13 +271,14 @@
               <th class="px-4 py-3.5 text-right">Horas Ord.</th>
               <th class="px-4 py-3.5 text-right">HE 25%</th>
               <th class="px-4 py-3.5 text-right">HE 35%</th>
+              <th class="px-4 py-3.5 text-right">Tardanza (h)</th>
               <th class="px-4 py-3.5 text-center">Estado</th>
               <th class="px-4 py-3.5 text-center no-print">Acciones</th>
             </tr>
           </thead>
           <tbody id="report-table-body" class="divide-y divide-slate-800/60 font-mono">
             <tr>
-              <td colspan="12" class="px-6 py-8 text-center text-slate-500 font-sans">
+              <td colspan="13" class="px-6 py-8 text-center text-slate-500 font-sans">
                 Selecciona un rango de fechas y presiona "Consultar Rango".
               </td>
             </tr>
@@ -391,10 +406,10 @@
   <div id="print-attendance-sheet" class="hidden"></div>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=9.1"></script>
-  <script src="/js/auth.js?v=9.1"></script>
+  <script src="/js/api.js?v=9.2"></script>
+  <script src="/js/auth.js?v=9.2"></script>
   <script src="/js/exceljs.min.js"></script>
-  <script src="/js/reports.js?v=9.1"></script>
+  <script src="/js/reports.js?v=9.2"></script>
   <script>
     lucide.createIcons();
   </script>

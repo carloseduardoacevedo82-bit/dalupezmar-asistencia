@@ -568,6 +568,19 @@ const updateAttendanceRecord = async (req, res) => {
     }
     calculatedWorked = Math.round(Number(calculatedWorked)) || 0;
 
+    // Recalcular tardanza
+    let calculatedLate = 0;
+    const resolvedStatus = status || existing.status;
+    if (resolvedStatus === 'PUNTUAL' || resolvedStatus === 'PRESENT') {
+      calculatedLate = 0;
+    } else if (cleanEntry) {
+      const expEntry = existing.expected_entry || '07:30:00';
+      calculatedLate = calculateTardiness(cleanEntry, expEntry, 15);
+    } else {
+      calculatedLate = existing.total_minutes_late || 0;
+    }
+    calculatedLate = Math.max(0, Math.round(Number(calculatedLate)) || 0);
+
     await db.query(`
       UPDATE attendances SET
         first_entry_time = $1,
@@ -576,15 +589,17 @@ const updateAttendanceRecord = async (req, res) => {
         last_exit_time = $4,
         status = $5,
         total_minutes_worked = $6,
+        total_minutes_late = $7,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7
+      WHERE id = $8
     `, [
       cleanEntry,
       cleanLunchStart,
       cleanLunchEnd,
       cleanExit,
-      status || existing.status,
+      resolvedStatus,
       calculatedWorked,
+      calculatedLate,
       id
     ]);
 
@@ -678,6 +693,15 @@ const createManualAttendance = async (req, res) => {
     }
     calculatedWorked = Math.round(Number(calculatedWorked)) || 0;
 
+    let calculatedLate = 0;
+    if (status === 'PUNTUAL' || status === 'PRESENT') {
+      calculatedLate = 0;
+    } else if (cleanEntry) {
+      const expEntry = '07:30:00';
+      calculatedLate = calculateTardiness(cleanEntry, expEntry, 15);
+    }
+    calculatedLate = Math.max(0, Math.round(Number(calculatedLate)) || 0);
+
     const existingRes = await db.query(
       'SELECT id FROM attendances WHERE employee_id = $1 AND attendance_date = $2',
       [employee_id, attendance_date]
@@ -692,19 +716,20 @@ const createManualAttendance = async (req, res) => {
           last_exit_time = $2,
           status = $3,
           total_minutes_worked = $4,
+          total_minutes_late = $5,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $5
-      `, [cleanEntry, cleanExit, status, calculatedWorked, existing.id]);
+        WHERE id = $6
+      `, [cleanEntry, cleanExit, status, calculatedWorked, calculatedLate, existing.id]);
 
       attId = existing.id;
     } else {
       const resIns = await db.query(`
         INSERT INTO attendances (
           employee_id, attendance_date, shift_id, status,
-          expected_entry, expected_exit, first_entry_time, last_exit_time, total_minutes_worked, is_complete
-        ) VALUES ($1, $2, $3, $4, '07:00:00', '19:00:00', $5, $6, $7, 1)
+          expected_entry, expected_exit, first_entry_time, last_exit_time, total_minutes_worked, total_minutes_late, is_complete
+        ) VALUES ($1, $2, $3, $4, '07:30:00', '19:00:00', $5, $6, $7, $8, 1)
         RETURNING id;
-      `, [employee_id, attendance_date, emp.shift_id || 1, status, cleanEntry, cleanExit, calculatedWorked]);
+      `, [employee_id, attendance_date, emp.shift_id || 1, status, cleanEntry, cleanExit, calculatedWorked, calculatedLate]);
 
       attId = resIns.rows[0].id;
     }

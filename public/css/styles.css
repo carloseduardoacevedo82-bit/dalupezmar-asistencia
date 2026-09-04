@@ -727,8 +727,88 @@ body.light-mode thead tr th {
     print-color-adjust: exact !important;
   }
 
-  .no-print, nav, .sidebar, header, button, #app-sidebar, .glass-panel:not(#print-attendance-sheet) {
+  .no-print, nav, .sidebar, header, button, #app-sidebar, #print-attendance-sheet.hidden, #print-attendance-sheet:empty {
     display: none !important;
+  }
+
+  /* Modo Impresión de Parte Diario: Ocultar todo el main y mostrar únicamente #print-attendance-sheet */
+  body.printing-daily-mode main,
+  body.printing-daily-mode nav,
+  body.printing-daily-mode .glass-panel,
+  body.printing-daily-mode .glass-card,
+  body.printing-daily-mode .grid,
+  body.printing-daily-mode header {
+    display: none !important;
+  }
+
+  body.printing-daily-mode #print-attendance-sheet {
+    display: block !important;
+  }
+
+  /* Modo Impresión de Tareo Consolidado (Tabla Principal) */
+  #tareo-table-container {
+    display: block !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    margin-top: 6px !important;
+    overflow: visible !important;
+  }
+
+  #tareo-table-container table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  #tareo-table-container th {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    border: 1px solid #475569 !important;
+    padding: 4px 4px !important;
+    font-size: 6.8pt !important;
+    text-align: center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #tareo-table-container td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 3px 4px !important;
+    font-size: 6.8pt !important;
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+  }
+
+  #tareo-table-container tbody tr:nth-child(even) td {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #tareo-print-header {
+    display: block !important;
+  }
+
+  /* Tarjetas KPI de Tareo en impresión limpia */
+  .print-kpi-container {
+    display: flex !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .print-kpi-container .glass-card {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    padding: 4px 8px !important;
+  }
+
+  .print-kpi-container p {
+    color: #0f172a !important;
   }
 
   /* Vista de Fotochecks en Impresión */
