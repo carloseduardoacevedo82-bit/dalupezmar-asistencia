@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dalupezmar-cache-v9.6';
+const CACHE_NAME = 'dalupezmar-cache-v9.7';
 const ASSETS_TO_CACHE = [
   '/',
   '/app.html',

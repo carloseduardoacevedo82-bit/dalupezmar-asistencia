@@ -359,15 +359,15 @@ async function selectEmployee(empId) {
 function renderBadge(emp) {
   if (!emp) return;
 
-  // Anverso: Apellidos ARRIBA y Nombres DEBAJO (apellidos primero)
+  // Anverso: Nombres ARRIBA y Apellidos DEBAJO (modelo original de fotocheck)
   const nombres = (emp.first_name || '').trim().toUpperCase();
   const apellidos = (emp.last_name || '').trim().toUpperCase();
 
   const nameContainer = document.getElementById('badge-fullname');
   if (nameContainer) {
     nameContainer.innerHTML = `
-      <span class="block text-sm font-black tracking-tight text-[#002855] leading-tight">${apellidos}</span>
-      <span class="block text-xs font-bold tracking-wide text-[#002855] leading-tight mt-0.5">${nombres}</span>
+      <span class="block text-xs font-black tracking-wide text-[#002855] leading-tight">${nombres}</span>
+      <span class="block text-sm font-black tracking-tight text-[#002855] leading-tight mt-0.5">${apellidos}</span>
     `;
   }
 
@@ -978,10 +978,10 @@ async function printEmployeesBadges(employeesList, subtitleText) {
           <img src="${item.photoSrc}" onerror="this.onerror=null;this.src='${defaultAvatarSvg}'" alt="Foto">
         </div>
 
-        <!-- Nombres y Apellidos Grandes y Legibles: Apellidos Primero -->
+        <!-- Nombres y Apellidos Grandes y Legibles: Nombres primero, Apellidos debajo -->
         <div class="name-block">
-          <div class="worker-surnames">${item.apellidos}</div>
           <div class="worker-names">${item.nombres}</div>
+          <div class="worker-surnames">${item.apellidos}</div>
           <div class="worker-dni">${item.docType}: ${item.emp.document_number}</div>
         </div>
 
