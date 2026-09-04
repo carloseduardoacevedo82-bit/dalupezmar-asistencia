@@ -86,6 +86,53 @@ const login = async (req, res) => {
  */
 const getProfile = async (req, res) => {
   try {
+    if (req.user && (req.user.role === 'WORKER' || req.user.employee_id)) {
+      const empId = req.user.employee_id || req.user.id;
+      const empRes = await db.query(`
+        SELECT 
+          e.*,
+          b.name as branch_name,
+          b.latitude as branch_lat,
+          b.longitude as branch_lng,
+          b.radius_meters as branch_radius,
+          d.name as department_name,
+          p.name as position_name,
+          s.name as shift_name,
+          s.entry_time as shift_entry_time,
+          s.exit_time as shift_exit_time
+        FROM employees e
+        LEFT JOIN branches b ON e.branch_id = b.id
+        LEFT JOIN departments d ON e.department_id = d.id
+        LEFT JOIN positions p ON e.position_id = p.id
+        LEFT JOIN shifts s ON e.shift_id = s.id
+        WHERE e.id = $1
+      `, [empId]);
+
+      const emp = empRes.rows[0];
+      if (!emp) {
+        return errorResponse(res, 'Trabajador no encontrado.', null, 404);
+      }
+
+      return successResponse(res, 'Perfil recuperado con éxito.', {
+        id: emp.id,
+        code: emp.employee_code,
+        document_number: emp.document_number,
+        name: `${emp.first_name} ${emp.last_name}`.trim(),
+        first_name: emp.first_name,
+        last_name: emp.last_name,
+        photo_url: emp.photo_url,
+        department: emp.department_name,
+        position: emp.position_name,
+        branch_name: emp.branch_name || 'PECEPE S.A.C.',
+        branch_lat: emp.branch_lat,
+        branch_lng: emp.branch_lng,
+        branch_radius: Number(emp.branch_radius) || 50,
+        shift_name: emp.shift_name,
+        shift_entry: emp.shift_entry_time,
+        shift_exit: emp.shift_exit_time
+      });
+    }
+
     const userRes = await db.query(`
       SELECT id, username, full_name, email, role, is_active, last_login, created_at
       FROM users WHERE id = $1
@@ -230,10 +277,10 @@ const workerLogin = async (req, res) => {
         photo_url: emp.photo_url,
         department: emp.department_name,
         position: emp.position_name,
-        branch_name: emp.branch_name || 'DALUPEZMAR Planta Principal',
+        branch_name: emp.branch_name || 'PECEPE S.A.C.',
         branch_lat: emp.branch_lat,
         branch_lng: emp.branch_lng,
-        branch_radius: emp.branch_radius || 350,
+        branch_radius: Number(emp.branch_radius) || 50,
         shift_name: emp.shift_name,
         shift_entry: emp.shift_entry_time,
         shift_exit: emp.shift_exit_time

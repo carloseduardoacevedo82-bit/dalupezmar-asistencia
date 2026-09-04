@@ -249,7 +249,7 @@ const punch = async (req, res) => {
         Number(emp.branch_lat),
         Number(emp.branch_lng)
       );
-      const allowedRadius = Number(emp.branch_radius) || 250;
+      const allowedRadius = Number(emp.branch_radius) || 50;
 
       // SI ESTÁ FUERA DEL RADIO PERMITIDO, SE BLOQUEA / PROHÍBE LA MARCACIÓN TOTALMENTE
       if (distanceToBranch > allowedRadius) {
@@ -262,7 +262,7 @@ const punch = async (req, res) => {
           ip
         );
 
-        return errorResponse(res, `⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de tu sede asignada (${emp.branch_name || 'Planta PECEPE'}).\n\nEstás a ${distanceToBranch} metros de distancia (Radio permitido: ${allowedRadius} metros).\n\nDebes estar físicamente dentro de la planta para poder registrar tu asistencia.`, {
+        return errorResponse(res, `⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de tu sede (${emp.branch_name || 'PECEPE S.A.C.'}).\n\nEstás a ${distanceToBranch} metros de distancia (Radio permitido: ${allowedRadius} metros).\n\nDebes estar físicamente dentro de las instalaciones de la planta para poder registrar tu asistencia.`, {
           error_code: 'OUTSIDE_GEOFENCE',
           distance_meters: distanceToBranch,
           allowed_radius: allowedRadius,

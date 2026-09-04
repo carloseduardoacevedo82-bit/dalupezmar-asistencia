@@ -167,8 +167,9 @@ async function init() {
 
   // 3. Asegurar Sedes
   const branches = [
+    { code: 'SED-PECEPE', name: 'PECEPE S.A.C.', address: 'Mza. 7 Lote. 27 Urb. Macropolis Etapa 2 Lima - Lima - Lurin', lat: -12.235619, lng: -76.810871, radius: 50 },
     { code: 'SED-01', name: 'DALUPEZMAR Planta Principal', address: 'Planta Operativa Industrial, Lima', lat: -12.045278, lng: -77.112222, radius: 350 },
-    { code: 'SED-02', name: 'Sede Central Administrativa', address: 'Oficina Central, Lima', lat: -12.089722, lng: -77.021111, radius: 200 },
+    { code: 'SED-02', name: 'Sede Central Administrativa', address: 'Oficina Central, Lima', lat: -12.089722, lng: -77.021111, radius: 50 },
     { code: 'SED-03', name: 'Operación Remota / Campo', address: 'Marcación Móvil Georreferenciada', lat: 0.0, lng: 0.0, radius: 50000 }
   ];
 

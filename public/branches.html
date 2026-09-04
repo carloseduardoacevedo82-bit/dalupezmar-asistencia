@@ -108,8 +108,8 @@
 
         <div>
           <label class="block text-[11px] font-bold text-slate-400 uppercase mb-1">Radio Permitido de Marcación (Metros)</label>
-          <input type="number" id="edit-branch-radius" value="300" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono font-bold">
-          <p class="text-[10px] text-slate-400 mt-1">Los trabajadores a más de esta distancia serán alertados.</p>
+          <input type="number" id="edit-branch-radius" value="50" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono font-bold">
+          <p class="text-[10px] text-slate-400 mt-1">Los trabajadores a más de esta distancia no podrán marcar asistencia.</p>
         </div>
 
         <div class="flex gap-3 pt-2">
@@ -150,7 +150,7 @@
                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black ${b.is_active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}">
                       ${b.code || 'SEDE'}
                     </span>
-                    <span class="text-[11px] text-cyan-400 font-mono font-bold">Radio: ${b.radius_meters || 150}m</span>
+                    <span class="text-[11px] text-cyan-400 font-mono font-bold">Radio: ${b.radius_meters || 50}m</span>
                   </div>
 
                   <h3 class="text-sm font-extrabold text-white">${b.name}</h3>
@@ -190,7 +190,7 @@
       document.getElementById('edit-branch-address').value = b.address || '';
       document.getElementById('edit-branch-lat').value = b.latitude || (currentAdminCoords ? currentAdminCoords.lat : '');
       document.getElementById('edit-branch-lng').value = b.longitude || (currentAdminCoords ? currentAdminCoords.lng : '');
-      document.getElementById('edit-branch-radius').value = b.radius_meters || 300;
+      document.getElementById('edit-branch-radius').value = b.radius_meters || 50;
 
       document.getElementById('modal-edit-branch').classList.remove('hidden');
     }
@@ -215,7 +215,7 @@
           address,
           latitude: latitude ? Number(latitude) : null,
           longitude: longitude ? Number(longitude) : null,
-          radius_meters: Number(radius_meters) || 300
+          radius_meters: Number(radius_meters) || 50
         });
 
         showToast('Geocerca GPS actualizada con éxito.', 'success');

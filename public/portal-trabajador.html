@@ -200,8 +200,8 @@
   </footer>
 
   <!-- Scripts -->
-  <script src="/js/api.js?v=8.8"></script>
-  <script src="/js/auth.js?v=8.8"></script>
+  <script src="/js/api.js?v=8.9"></script>
+  <script src="/js/auth.js?v=8.9"></script>
   <script>
     lucide.createIcons();
 
@@ -242,7 +242,22 @@
       if (savedWorker && token) {
         try {
           currentWorker = JSON.parse(savedWorker);
+          if (currentWorker) {
+            currentWorker.branch_radius = 50;
+          }
           renderWorkerDashboard();
+
+          // Sincronizar en segundo plano con el perfil fresco del servidor
+          if (api.auth && typeof api.auth.profile === 'function') {
+            api.auth.profile().then(res => {
+              if (res && res.success && res.data) {
+                currentWorker = { ...currentWorker, ...res.data };
+                currentWorker.branch_radius = Number(currentWorker.branch_radius) || 50;
+                localStorage.setItem('dalupezmar_worker_user', JSON.stringify(currentWorker));
+                renderWorkerDashboard();
+              }
+            }).catch(() => {});
+          }
           return;
         } catch (e) {
           localStorage.removeItem('dalupezmar_worker_user');
@@ -352,7 +367,7 @@
           };
 
           const dist = getDistanceFromBranch(workerGps.lat, workerGps.lng);
-          const maxRadius = Number(currentWorker?.branch_radius) || 250;
+          const maxRadius = Number(currentWorker?.branch_radius) || 50;
 
           if (dist !== null) {
             if (dist <= maxRadius) {
@@ -472,9 +487,9 @@
 
       // 4. Validación inmediata de Geocerca: Si está fuera del radio, PROHIBIR marcar
       const distToBranch = getDistanceFromBranch(workerGps.lat, workerGps.lng);
-      const allowedRadius = Number(currentWorker?.branch_radius) || 250;
+      const allowedRadius = Number(currentWorker?.branch_radius) || 50;
       if (distToBranch !== null && distToBranch > allowedRadius) {
-        alert(`⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de tu sede (${currentWorker?.branch_name || 'Planta PECEPE'}).\n\nEstás a ${distToBranch} metros de distancia (Radio permitido: ${allowedRadius} metros).\n\nDebes estar físicamente dentro de las instalaciones de la planta para poder registrar tu asistencia.`);
+        alert(`⛔ MARCACIÓN DENEGADA POR GEOCERCA:\n\nTe encuentras fuera del área autorizada de tu sede (${currentWorker?.branch_name || 'PECEPE S.A.C.'}).\n\nEstás a ${distToBranch} metros de distancia (Radio permitido: ${allowedRadius} metros).\n\nDebes estar físicamente dentro de las instalaciones de la planta para poder registrar tu asistencia.`);
         return;
       }
 
