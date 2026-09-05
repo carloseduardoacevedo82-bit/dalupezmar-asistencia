@@ -94,9 +94,13 @@ app.use(express.static(path.join(__dirname, '../public'), {
 }));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
-// Rutas directas limpias para el portal del trabajador
+// Rutas directas limpias para el portal del trabajador y kiosko
 app.get(['/trabajador', '/portal-trabajador'], (req, res) => {
   res.sendFile(path.join(__dirname, '../public/portal-trabajador.html'));
+});
+
+app.get(['/kiosk', '/quiosco', '/kiosko'], (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/kiosk.html'));
 });
 
 // Rutas de la API REST v1
