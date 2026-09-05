@@ -18,7 +18,12 @@ router.get('/trabajador/:workerId', verifyToken, signatureController.getWorkerDo
 router.get('/all', verifyToken, requireRoles('ADMIN', 'HR', 'AUDITOR'), signatureController.getAllDocuments);
 router.get('/', verifyToken, signatureController.getAllDocuments);
 
-// Webhook para eventos desde el portal de firmas (abierto o validado con secret)
+// Webhook para eventos desde el portal de firmas y subida de documentos
 router.post('/webhook', signatureController.handleSignatureWebhook);
+router.post('/upload-document', signatureController.handleSignatureWebhook);
+
+// Sincronización hacia PC
+router.get('/pending-uploaded-docs', signatureController.getPendingUploadedDocuments);
+router.post('/mark-uploaded-doc-synced', signatureController.markUploadedDocumentSynced);
 
 module.exports = router;

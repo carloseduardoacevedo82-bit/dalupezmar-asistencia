@@ -335,10 +335,66 @@ const getAllDocuments = async (req, res) => {
 
 /**
  * 5. Webhook callback del portal de firma para actualizar estado (FIRMADO, RECHAZADO, etc.)
+ * y receptor de documentos y fotos subidos desde el portal del trabajador.
  */
 const handleSignatureWebhook = async (req, res) => {
   try {
-    const { portal_firma_id, document_id, event, signed_url, timestamp } = req.body;
+    const {
+      portal_firma_id,
+      document_id,
+      event,
+      signed_url,
+      timestamp,
+      worker_dni,
+      worker_id,
+      worker_name,
+      nombre_archivo,
+      tipo,
+      codigo_formato,
+      base64Data
+    } = req.body;
+
+    // Manejar subida directa de documento de trabajador (DNI por ambas caras, CV, Certijoven, etc.)
+    if (event === 'DOCUMENT_UPLOAD' || (base64Data && nombre_archivo)) {
+      const targetDni = String(worker_dni || '').trim();
+      const targetName = String(nombre_archivo || 'Documento_Subido.pdf').trim();
+      const targetType = String(tipo || 'requisito').trim();
+      const targetCodigo = String(codigo_formato || 'REQUISITO-GEN').trim();
+      const rawB64 = base64Data || signed_url || '';
+
+      let fileBuffer = null;
+      let mimeType = 'application/pdf';
+      if (rawB64 && typeof rawB64 === 'string') {
+        const m = rawB64.match(/^data:([^;]+);base64,(.+)$/);
+        if (m) {
+          mimeType = m[1];
+          fileBuffer = Buffer.from(m[2], 'base64');
+        } else {
+          fileBuffer = Buffer.from(rawB64, 'base64');
+        }
+      }
+
+      const insertRes = await db.query(`
+        INSERT INTO worker_uploaded_documents (
+          worker_dni, worker_id, worker_name, nombre_archivo, tipo, codigo_formato,
+          mime_type, file_data, base64_data, synced_to_pc, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, NOW(), NOW())
+        RETURNING id, worker_dni, nombre_archivo, created_at;
+      `, [
+        targetDni,
+        worker_id || targetDni,
+        worker_name || 'Trabajador DALUPEZMAR',
+        targetName,
+        targetType,
+        targetCodigo,
+        mimeType,
+        fileBuffer,
+        rawB64
+      ]);
+
+      console.log(`📥 [Document Upload] Guardado en PostgreSQL: ${targetName} para DNI ${targetDni}`);
+      return successResponse(res, 'Documento subido y guardado exitosamente en PostgreSQL.', insertRes.rows[0]);
+    }
 
     if (!portal_firma_id && !document_id) {
       return errorResponse(res, 'portal_firma_id o document_id requerido.', null, 400);
@@ -372,10 +428,55 @@ const handleSignatureWebhook = async (req, res) => {
   }
 };
 
+/**
+ * 6. Obtener documentos subidos pendientes de sincronizar a la PC
+ */
+const getPendingUploadedDocuments = async (req, res) => {
+  try {
+    const docs = await db.query(`
+      SELECT id, worker_dni, worker_id, worker_name, nombre_archivo, tipo, codigo_formato, mime_type, base64_data, created_at
+      FROM worker_uploaded_documents
+      WHERE synced_to_pc = FALSE OR synced_to_pc IS NULL
+      ORDER BY id ASC
+      LIMIT 100;
+    `);
+
+    return successResponse(res, 'Documentos pendientes de sincronización a PC.', docs.rows);
+  } catch (error) {
+    console.error('Error obteniendo documentos pendientes:', error);
+    return errorResponse(res, 'Error al consultar documentos pendientes.', error.message);
+  }
+};
+
+/**
+ * 7. Marcar documento subido como sincronizado en la PC
+ */
+const markUploadedDocumentSynced = async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return errorResponse(res, 'id del documento es requerido.', null, 400);
+    }
+
+    await db.query(`
+      UPDATE worker_uploaded_documents
+      SET synced_to_pc = TRUE, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1;
+    `, [Number(id)]);
+
+    return successResponse(res, `Documento ${id} marcado como sincronizado en la PC.`);
+  } catch (error) {
+    console.error('Error marcando documento sincronizado:', error);
+    return errorResponse(res, 'Error al actualizar estado de sincronización.', error.message);
+  }
+};
+
 module.exports = {
   sendDocumentForSignature,
   retryFailedSignatures,
   getWorkerDocuments,
   getAllDocuments,
-  handleSignatureWebhook
+  handleSignatureWebhook,
+  getPendingUploadedDocuments,
+  markUploadedDocumentSynced
 };
