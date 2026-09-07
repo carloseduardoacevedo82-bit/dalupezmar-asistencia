@@ -8,5 +8,7 @@ router.use(verifyApiKey);
 
 router.get('/attendances', apiIntegrationController.exportAttendanceForERP);
 router.post('/employees/sync', apiIntegrationController.syncEmployeesFromERP);
+router.delete('/employees/:dniOrId', apiIntegrationController.deleteEmployeeFromIntegration);
+router.post('/employees/delete', apiIntegrationController.deleteEmployeeFromIntegration);
 
 module.exports = router;

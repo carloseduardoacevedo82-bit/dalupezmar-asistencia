@@ -246,8 +246,53 @@ const getEmployeesRoster = async (req, res) => {
   }
 };
 
+/**
+ * Eliminar empleado físicamente desde integración externa (ERP / EPP Control)
+ */
+const deleteEmployeeFromIntegration = async (req, res) => {
+  try {
+    const dniOrId = req.params.dniOrId || req.body.dni || req.body.id || req.body.document_number;
+    if (!dniOrId) {
+      return errorResponse(res, 'Debe especificar el DNI o ID del empleado a eliminar.', null, 400);
+    }
+
+    const docStr = String(dniOrId).trim();
+    const numId = parseInt(docStr, 10);
+
+    const existingRes = await db.query(
+      'SELECT id, document_number, first_name, last_name FROM employees WHERE document_number = $1 OR id = $2 LIMIT 1',
+      [docStr, isNaN(numId) ? -1 : numId]
+    );
+
+    const existing = existingRes.rows[0];
+    if (!existing) {
+      return successResponse(res, 'El colaborador ya no existe en el sistema de Asistencia.', { deleted: false, doc: docStr });
+    }
+
+    const empId = existing.id;
+    await db.transaction(async (client) => {
+      await client.query('DELETE FROM badges WHERE employee_id = $1', [empId]);
+      await client.query('DELETE FROM attendance_logs WHERE employee_id = $1', [empId]);
+      await client.query('DELETE FROM attendances WHERE employee_id = $1', [empId]);
+      await client.query('DELETE FROM justifications WHERE employee_id = $1', [empId]);
+      await client.query('DELETE FROM documentos_firma WHERE trabajador_id = $1', [empId]);
+      await client.query('DELETE FROM employees WHERE id = $1', [empId]);
+    });
+
+    return successResponse(res, `Colaborador ${existing.first_name} ${existing.last_name} (DNI ${existing.document_number}) eliminado permanentemente de Asistencia.`, {
+      deleted: true,
+      id: empId,
+      document_number: existing.document_number
+    });
+  } catch (error) {
+    return errorResponse(res, 'Error al eliminar colaborador desde integración.', error.message, 500);
+  }
+};
+
 module.exports = {
   exportAttendanceForERP,
   syncEmployeesFromERP,
-  getEmployeesRoster
+  getEmployeesRoster,
+  deleteEmployeeFromIntegration
 };
+

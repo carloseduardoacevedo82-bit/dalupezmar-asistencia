@@ -4,6 +4,7 @@ const db = require('../../database/database');
 const { successResponse, errorResponse } = require('../utils/responseHandler');
 const { generateSecureQrToken, generateBarcodeValue } = require('../utils/badgeGenerator');
 const { getPeruDateString } = require('../utils/timeCalculations');
+const { notificarHaciaEPPControl } = require('../utils/eppIntegration');
 
 /**
  * Listar empleados con filtros dinámicos y paginación (Async PostgreSQL)
@@ -272,6 +273,22 @@ const createEmployee = async (req, res) => {
       };
     });
 
+    // Notificar en tiempo real hacia EPP Control
+    notificarHaciaEPPControl('UPSERT', {
+      employee: {
+        dni: document_number,
+        codigoFotocheck: createdInfo.employee_code,
+        nombres: first_name,
+        apellidos: last_name,
+        cargo: req.body.position_name || 'Operario',
+        area: req.body.department_name || 'Producción',
+        estado: status === 'INACTIVE' ? 'inactivo' : 'activo',
+        grupoSanguineo: blood_type || 'O+',
+        contactoEmergencia: emergency_contact_phone || '+51 911111111',
+        plantaPrincipal: 'DALUPEZMAR Planta Principal'
+      }
+    });
+
     return successResponse(res, 'Empleado registrado y fotocheck emitido correctamente.', createdInfo, 201);
   } catch (error) {
     console.error('Error al crear empleado:', error);
@@ -400,6 +417,24 @@ const updateEmployee = async (req, res) => {
       }
     });
 
+    // Sincronizar en tiempo real hacia EPP Control
+    db.query('SELECT * FROM employees WHERE id = $1', [id]).then((updatedRes) => {
+      const updated = updatedRes.rows[0];
+      if (updated) {
+        notificarHaciaEPPControl('UPSERT', {
+          employee: {
+            dni: updated.document_number,
+            codigoFotocheck: updated.employee_code,
+            nombres: updated.first_name,
+            apellidos: updated.last_name,
+            estado: updated.status === 'INACTIVE' ? 'inactivo' : 'activo',
+            grupoSanguineo: updated.blood_type || 'O+',
+            contactoEmergencia: updated.emergency_contact_phone || '+51 911111111'
+          }
+        });
+      }
+    }).catch(e => console.warn('[EPP Sync] Error al obtener datos para notificar:', e.message));
+
     return successResponse(res, 'Empleado actualizado exitosamente.');
   } catch (error) {
     return errorResponse(res, 'Error al actualizar empleado.', error.message);
@@ -519,6 +554,14 @@ const deleteEmployee = async (req, res) => {
       await client.query('DELETE FROM justifications WHERE employee_id = $1', [id]);
       await client.query('DELETE FROM documentos_firma WHERE trabajador_id = $1', [id]);
       await client.query('DELETE FROM employees WHERE id = $1', [id]);
+    });
+
+    // Notificar eliminación definitiva hacia EPP Control
+    notificarHaciaEPPControl('DELETE', {
+      dni: existing.document_number,
+      id: id,
+      nombres: existing.first_name,
+      apellidos: existing.last_name
     });
 
     return successResponse(res, `Colaborador ${existing.first_name} ${existing.last_name} eliminado permanentemente.`);
