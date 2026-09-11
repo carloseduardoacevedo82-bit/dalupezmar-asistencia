@@ -163,7 +163,8 @@ const createEmployee = async (req, res) => {
       position_id,
       shift_id,
       work_mode = 'PRESENTIAL',
-      template_theme = 'DALUPEZMAR_OFFICIAL'
+      template_theme = 'DALUPEZMAR_OFFICIAL',
+      status = 'ACTIVE'
     } = req.body;
 
     if (!document_number || !first_name || !last_name || !branch_id || !department_id || !position_id || !shift_id) {
@@ -273,21 +274,21 @@ const createEmployee = async (req, res) => {
       };
     });
 
-    // Notificar en tiempo real hacia EPP Control
+    // Notificar en tiempo real hacia EPP Control en segundo plano (sin bloquear la respuesta)
     notificarHaciaEPPControl('UPSERT', {
       employee: {
-        dni: document_number,
+        dni: document_number.trim(),
         codigoFotocheck: createdInfo.employee_code,
-        nombres: first_name,
-        apellidos: last_name,
+        nombres: first_name.trim(),
+        apellidos: last_name.trim(),
         cargo: req.body.position_name || 'Operario',
         area: req.body.department_name || 'Producción',
-        estado: status === 'INACTIVE' ? 'inactivo' : 'activo',
+        estado: (status === 'INACTIVE' || status === 'inactivo') ? 'inactivo' : 'activo',
         grupoSanguineo: blood_type || 'O+',
         contactoEmergencia: emergency_contact_phone || '+51 911111111',
         plantaPrincipal: 'DALUPEZMAR Planta Principal'
       }
-    });
+    }).catch(eppErr => console.warn('[EPP Sync] Error en background notification createEmployee:', eppErr.message));
 
     return successResponse(res, 'Empleado registrado y fotocheck emitido correctamente.', createdInfo, 201);
   } catch (error) {
